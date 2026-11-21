@@ -33,7 +33,7 @@ async function playerRequestToken(yt: Innertube, client: PlayerClientName): Prom
   if (!WEBPO_CLIENTS.has(client)) return undefined;
   const visitorData = yt.session.context.client.visitorData;
   if (!visitorData) return undefined;
-  return botguard.mint(decodeURIComponent(visitorData));
+  return botguard.mint(decodeURIComponent(visitorData)).catch(() => undefined);
 }
 
 /** StreamResolver: how many clients are worth trying for one track. */

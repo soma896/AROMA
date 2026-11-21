@@ -5,6 +5,7 @@ import { Constants, Utils, YT, type Innertube } from 'youtubei.js/web';
 import { timed, trackLog } from '../trackLog';
 import { botguard } from './botguard';
 import { ytAuthSnapshot } from '@/extension/useYtAuth';
+import { getBridge } from '@/extension/bridge';
 import { getInnertube, getSignedInnertube } from './innertube';
 import {
   CLIENT_ATTEMPTS,
@@ -112,6 +113,16 @@ export class YouTubeEngine {
     shaka.polyfill.installAll();
     if (!shaka.Player.isBrowserSupported()) throw new Error('This browser can’t play YouTube streams (no Media Source Extensions)');
     const player = new shaka.Player();
+    player.getNetworkingEngine().registerRequestFilter((_type, request) => {
+      if (!getBridge()) {
+        request.uris = request.uris.map((uri) => {
+          if (uri.includes('googlevideo.com')) {
+            return `/__googlevideo__?url=${encodeURIComponent(uri)}`;
+          }
+          return uri;
+        });
+      }
+    });
     player.configure({
       manifest: { disableVideo: true, disableText: true, disableThumbnails: true },
       abr: { enabled: false },

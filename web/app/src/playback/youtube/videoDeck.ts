@@ -1,4 +1,5 @@
 import shaka from 'shaka-player/dist/shaka-player.compiled';
+import { getBridge } from '@/extension/bridge';
 import { getVideoElement, qualityLabel, setVideoQuality, useVideo, type VideoQuality } from '@/state/video';
 import { trackLog } from '../trackLog';
 import type { YouTubeEngine } from './engine';
@@ -44,6 +45,16 @@ let listening: HTMLAudioElement | null = null;
 async function ensurePlayer(): Promise<shaka.Player> {
   if (player) return player;
   const created = new shaka.Player();
+  created.getNetworkingEngine().registerRequestFilter((_type, request) => {
+    if (!getBridge()) {
+      request.uris = request.uris.map((uri) => {
+        if (uri.includes('googlevideo.com')) {
+          return `/__googlevideo__?url=${encodeURIComponent(uri)}`;
+        }
+        return uri;
+      });
+    }
+  });
   created.configure({
     manifest: { disableAudio: true, disableText: true, disableThumbnails: true },
     // H.264 first: every browser decodes it in hardware. A picked height above

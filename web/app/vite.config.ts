@@ -61,7 +61,8 @@ function youtubeProxyPlugin(): Plugin {
             headers.set('Origin', originHost);
             headers.set('Referer', `${originHost}/`);
           } else {
-            headers.set('Referer', 'https://www.youtube.com/');
+            headers.delete('origin');
+            headers.delete('referer');
           }
           headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
 
@@ -81,6 +82,7 @@ function youtubeProxyPlugin(): Plugin {
             redirect: 'follow',
           });
 
+          const buf = Buffer.from(await response.arrayBuffer());
           res.statusCode = response.status;
           response.headers.forEach((val, key) => {
             const lower = key.toLowerCase();
@@ -88,12 +90,12 @@ function youtubeProxyPlugin(): Plugin {
               res.setHeader(key, val);
             }
           });
+          res.setHeader('content-length', String(buf.length));
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
           res.setHeader('Access-Control-Allow-Headers', '*');
           res.setHeader('Access-Control-Expose-Headers', '*');
 
-          const buf = Buffer.from(await response.arrayBuffer());
           res.end(buf);
         } catch (err: any) {
           console.error('[youtube-proxy error]', err);
