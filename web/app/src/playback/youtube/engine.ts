@@ -113,7 +113,7 @@ export class YouTubeEngine {
     shaka.polyfill.installAll();
     if (!shaka.Player.isBrowserSupported()) throw new Error('This browser can’t play YouTube streams (no Media Source Extensions)');
     const player = new shaka.Player();
-    player.getNetworkingEngine().registerRequestFilter((_type, request) => {
+    player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
       if (!getBridge()) {
         request.uris = request.uris.map((uri) => {
           if (uri.includes('googlevideo.com')) {

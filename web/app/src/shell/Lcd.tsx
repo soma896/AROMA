@@ -180,18 +180,18 @@ export function Lcd() {
 
 // Elapsed and remaining, over the line's two ends while the pointer is on it.
 const time =
-  'pointer-events-none absolute bottom-[11px] type-[600_11px/13px] tabular-nums text-primary opacity-0 transition-opacity group-hover/scrub:opacity-100 group-data-dragging/scrub:opacity-100';
+  'pointer-events-none absolute bottom-[11px] type-[600_11px/13px] tabular-nums text-purple-300 font-mono drop-shadow-[0_0_4px_rgba(168,85,247,0.6)] opacity-0 transition-opacity group-hover/scrub:opacity-100 group-data-dragging/scrub:opacity-100';
 
 /**
- * Elapsed time as a 2px line along the LCD's bottom (report §1). Hovering
- * shows the times; pressing or dragging on the line seeks.
+ * Interactive Seek Bar along the player bar bottom.
+ * Shows elapsed time, remaining time, a gradient progress bar, and a draggable glowing thumb.
  */
 function Progress() {
-  const { bar, elapsed, remaining, dragging, handlers } = useScrubber();
+  const { bar, thumb, elapsed, remaining, dragging, handlers } = useScrubber();
   return (
-    // The hit area: taller than the 2px line it carries.
+    // The hit area: taller than the line it carries.
     <div
-      className="group/scrub absolute inset-x-0 bottom-0 h-3.5 cursor-pointer touch-none"
+      className="group/scrub absolute inset-x-0 bottom-0 h-4 cursor-pointer touch-none select-none flex items-center"
       data-scrubber
       data-dragging={dragging || undefined}
       {...handlers}
@@ -199,12 +199,21 @@ function Progress() {
       <span ref={elapsed} className={`${time} left-0`} />
       <span ref={remaining} className={`${time} right-0`} />
       <div
-        className="absolute inset-x-0 bottom-1.5 h-0.5 overflow-hidden rounded-[1px] bg-quaternary transition-[height,left,right] duration-100 ease-in group-hover/scrub:bottom-[5px] group-hover/scrub:h-1 group-data-dragging/scrub:bottom-[5px] group-data-dragging/scrub:h-1"
+        className="relative inset-x-0 w-full h-[3px] overflow-hidden rounded-full bg-white/10 backdrop-blur-xs transition-[height] duration-100 ease-in group-hover/scrub:h-[6px] group-data-dragging/scrub:h-[6px]"
         aria-hidden="true"
       >
         <MixWindowHighlight />
-        <div ref={bar} className="relative size-full origin-left scale-x-(--progress) bg-secondary [--progress:0]" />
+        <div
+          ref={bar}
+          className="relative size-full origin-left scale-x-(--progress) rounded-full bg-gradient-to-r from-purple-500 via-violet-400 to-blue-400 shadow-[0_0_8px_rgba(168,85,247,0.7)] [--progress:0]"
+        />
       </div>
+      {/* Draggable glowing glass thumb */}
+      <div
+        ref={thumb}
+        className="pointer-events-none absolute top-1/2 -translate-y-1/2 size-3 rounded-full bg-white shadow-[0_0_10px_rgba(168,85,247,0.9)] border border-purple-300/80 -translate-x-1/2 opacity-0 scale-75 group-hover/scrub:opacity-100 group-hover/scrub:scale-100 group-data-dragging/scrub:opacity-100 group-data-dragging/scrub:scale-110 transition-[opacity,transform] duration-150 ease-out"
+        style={{ left: 'calc(var(--progress, 0) * 100%)' }}
+      />
     </div>
   );
 }

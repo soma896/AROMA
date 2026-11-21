@@ -45,7 +45,7 @@ let listening: HTMLAudioElement | null = null;
 async function ensurePlayer(): Promise<shaka.Player> {
   if (player) return player;
   const created = new shaka.Player();
-  created.getNetworkingEngine().registerRequestFilter((_type, request) => {
+  created.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
     if (!getBridge()) {
       request.uris = request.uris.map((uri) => {
         if (uri.includes('googlevideo.com')) {

@@ -78,7 +78,7 @@ function youtubeProxyPlugin(): Plugin {
           const response = await fetch(targetUrl, {
             method: req.method,
             headers,
-            body,
+            body: body as unknown as BodyInit,
             redirect: 'follow',
           });
 

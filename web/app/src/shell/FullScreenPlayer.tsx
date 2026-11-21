@@ -46,23 +46,29 @@ function useBrowserFullScreen(): boolean {
 
 /** The seek line under the track's names: thicker on hover, with the times beneath its ends. */
 function Scrubber() {
-  const { bar, elapsed, remaining, mixLabel, dragging, handlers } = useScrubber();
+  const { bar, thumb, elapsed, remaining, mixLabel, dragging, handlers } = useScrubber();
   return (
     <div className="group/scrub mt-3.5" data-dragging={dragging || undefined}>
       {/* A taller hit area than the line it carries. */}
-      <div className="group/hit flex h-4 cursor-pointer touch-none items-center" {...handlers}>
+      <div className="group/hit relative flex h-5 cursor-pointer touch-none items-center" {...handlers}>
         <div
-          className="relative h-1 flex-1 overflow-hidden rounded-[999px] bg-quaternary transition-[height] duration-120 ease-in group-hover/hit:h-2 group-data-dragging/scrub:h-2"
+          className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-white/10 backdrop-blur-xs transition-[height] duration-120 ease-in group-hover/hit:h-2.5 group-data-dragging/scrub:h-2.5"
           aria-hidden="true"
         >
           <MixWindowHighlight />
           <div
             ref={bar}
-            className="relative size-full origin-left scale-x-(--progress) bg-gradient-to-r from-purple-500 via-violet-400 to-blue-400 transition-[background-color] duration-120 ease-in [--progress:0]"
+            className="relative size-full origin-left scale-x-(--progress) rounded-full bg-gradient-to-r from-purple-500 via-violet-400 to-blue-400 shadow-[0_0_8px_rgba(168,85,247,0.7)] transition-[background-color] duration-120 ease-in [--progress:0]"
           />
         </div>
+        {/* Glowing knob for FullScreenPlayer */}
+        <div
+          ref={thumb}
+          className="pointer-events-none absolute top-1/2 -translate-y-1/2 size-4 rounded-full bg-white shadow-[0_0_12px_rgba(168,85,247,0.9)] border border-purple-200 opacity-0 group-hover/hit:opacity-100 group-data-dragging/scrub:opacity-100 transition-[opacity,transform] duration-150 ease-out -translate-x-1/2"
+          style={{ left: 'calc(var(--progress, 0) * 100%)' }}
+        />
       </div>
-      <div className="relative mt-0.5 flex justify-between type-[500_11px/14px] tabular-nums text-tertiary">
+      <div className="relative mt-1 flex justify-between type-[500_12px/16px] tabular-nums text-purple-200/80 font-mono">
         <span ref={elapsed} />
         <span ref={mixLabel} className="pointer-events-none absolute inset-x-0 text-center text-secondary opacity-0" aria-hidden="true">
           Mixing
