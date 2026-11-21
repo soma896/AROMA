@@ -32,7 +32,7 @@ export default defineConfig(({ command, mode }) => {
       DEV_EXTENSION_ID: JSON.stringify(devExtensionId()),
     },
     resolve: {
-      alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+      alias: { '@': fileURLToPath(new URL('./src', import.meta.url)).replace(/\\/g, '/') },
     },
     // AutoMix's analysis worker (playback/automix): essentia.js's 2021-era
     // Emscripten glue breaks under dep pre-bundling, and the worker is a module.
