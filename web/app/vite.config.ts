@@ -43,6 +43,26 @@ export default defineConfig(({ command, mode }) => {
       // exactly, so the port must not drift to 5174 when 5173 is busy.
       port: 5173,
       strictPort: true,
+      proxy: {
+        '/__yt_music__': {
+          target: 'https://music.youtube.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/__yt_music__/, ''),
+          headers: {
+            Origin: 'https://music.youtube.com',
+            Referer: 'https://music.youtube.com/',
+          },
+        },
+        '/__yt_www__': {
+          target: 'https://www.youtube.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/__yt_www__/, ''),
+          headers: {
+            Origin: 'https://www.youtube.com',
+            Referer: 'https://www.youtube.com/',
+          },
+        },
+      },
     },
   };
 });

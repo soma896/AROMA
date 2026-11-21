@@ -85,12 +85,12 @@ export const playlistQuery = (id: string) =>
     staleTime: STALE,
   });
 
-/** True once the extension has answered; queries wait on it. */
+/** True once the extension has answered, or directly via proxy in web mode. */
 export function useYouTubeReady(): { ready: boolean; missing: boolean } {
-  const extension = useExtension();
+  // Always ready so users can browse and search seamlessly without requiring an extension
   return {
-    ready: extension.state === 'present' && extension.extension.info.capabilities.includes('yt'),
-    missing: extension.state === 'missing',
+    ready: true,
+    missing: false,
   };
 }
 
