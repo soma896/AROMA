@@ -107,8 +107,8 @@ export function Lcd() {
 
   if (!nowPlaying) {
     return (
-      <div className="grid h-full place-items-center text-tertiary">
-        <LogoMark size={26} />
+      <div className="grid h-full place-items-center text-white/70">
+        <LogoMark size={28} />
       </div>
     );
   }
