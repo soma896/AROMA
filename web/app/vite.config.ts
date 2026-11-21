@@ -22,7 +22,8 @@ function youtubeProxyPlugin(): Plugin {
       server.middlewares.use(async (req, res, next) => {
         const isMusic = req.url?.startsWith('/__yt_music__');
         const isWww = req.url?.startsWith('/__yt_www__');
-        if (!isMusic && !isWww) return next();
+        const isGv = req.url?.startsWith('/__googlevideo__');
+        if (!isMusic && !isWww && !isGv) return next();
 
         if (req.method === 'OPTIONS') {
           res.statusCode = 204;
@@ -33,9 +34,22 @@ function youtubeProxyPlugin(): Plugin {
         }
 
         try {
-          const originHost = isMusic ? 'https://music.youtube.com' : 'https://www.youtube.com';
-          const subPath = req.url!.replace(isMusic ? /^\/__yt_music__/ : /^\/__yt_www__/, '');
-          const targetUrl = new URL(subPath, originHost).toString();
+          let targetUrl: string;
+          let originHost = 'https://www.youtube.com';
+
+          if (isGv) {
+            const parsed = new URL(req.url!, 'http://localhost');
+            const urlParam = parsed.searchParams.get('url');
+            if (!urlParam) {
+              res.statusCode = 400;
+              return res.end('Missing url');
+            }
+            targetUrl = urlParam;
+          } else {
+            originHost = isMusic ? 'https://music.youtube.com' : 'https://www.youtube.com';
+            const subPath = req.url!.replace(isMusic ? /^\/__yt_music__/ : /^\/__yt_www__/, '');
+            targetUrl = new URL(subPath, originHost).toString();
+          }
 
           const headers = new Headers();
           for (const [k, v] of Object.entries(req.headers)) {
@@ -43,8 +57,12 @@ function youtubeProxyPlugin(): Plugin {
             if (typeof v === 'string') headers.set(k, v);
             else if (Array.isArray(v)) v.forEach((val) => headers.append(k, val));
           }
-          headers.set('Origin', originHost);
-          headers.set('Referer', `${originHost}/`);
+          if (!isGv) {
+            headers.set('Origin', originHost);
+            headers.set('Referer', `${originHost}/`);
+          } else {
+            headers.set('Referer', 'https://www.youtube.com/');
+          }
           headers.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
 
           let body: Buffer | undefined;
@@ -73,6 +91,7 @@ function youtubeProxyPlugin(): Plugin {
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
           res.setHeader('Access-Control-Allow-Headers', '*');
+          res.setHeader('Access-Control-Expose-Headers', '*');
 
           const buf = Buffer.from(await response.arrayBuffer());
           res.end(buf);

@@ -29,6 +29,7 @@ import {
   headersToGenericObject,
   makeResponse
 } from './shakaHelpers';
+import { getBridge } from '@/extension/bridge';
 
 interface ShakaResponseArgs {
   uri: string;
@@ -309,7 +310,11 @@ export class ShakaPlayerAdapter implements SabrPlayerAdapter {
       }
 
 
-      const response = await fetch(uri, init);
+      let fetchUri = uri;
+      if (!getBridge() && uri.includes('googlevideo.com')) {
+        fetchUri = `/__googlevideo__?url=${encodeURIComponent(uri)}`;
+      }
+      const response = await fetch(fetchUri, init);
       headersReceived(headersToGenericObject(response.headers));
 
       if (requestMetadata && init.method !== 'HEAD' && response.headers.get('content-type') === 'application/vnd.yt-ump') {

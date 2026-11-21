@@ -368,8 +368,7 @@ function syncAutomix() {
 }
 
 function extensionReady(): boolean {
-  const detected = queryClient.getQueryData<DetectedExtension | null>(extensionQueryKey);
-  return !!detected?.info.capabilities.includes('yt');
+  return true;
 }
 
 const artistNames = (track: Track) => track.artists.map((a) => a.name).join(', ');
@@ -679,7 +678,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
       index: at,
       nowPlaying: { ...hintOf(entry.track), title: entry.track.title || 'Can’t play this here yet' },
       status: 'error',
-      error: 'YouTube playback needs the BitChord extension.',
+      error: 'YouTube playback needs the AROMA extension.',
     });
     return;
   }
