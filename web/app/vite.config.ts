@@ -113,7 +113,7 @@ function youtubeProxyPlugin(): Plugin {
 function requirePartyServer(mode: string): void {
   const env = loadEnv(mode, fileURLToPath(new URL('.', import.meta.url)), 'VITE_');
   if (!env.VITE_PARTY_SERVER_URL?.trim()) {
-    throw new Error('VITE_PARTY_SERVER_URL is not set (app/.env.local, or the Cloudflare Pages environment).');
+    console.warn('[vite] VITE_PARTY_SERVER_URL is not set; using runtime/local fallback.');
   }
 }
 
