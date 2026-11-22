@@ -215,12 +215,11 @@ function Header() {
 export function TrackList({ tracks, variant, fallbackArtwork, fallbackArtists, onNearEnd, source }: TrackListProps) {
   const playRow = (i: number) => {
     // Rows from another catalogue that found no YouTube Music song stay out of the queue.
-    if (source) {
-      const playable = tracks.filter((t) => !t.unavailable);
-      return playList(playable, Math.max(0, playable.indexOf(tracks[i]!)), { source, fallbackArtwork, fallbackArtists });
-    }
-    const track = tracks[i]!;
-    playTrack(track.artists.length || !fallbackArtists ? track : { ...track, artists: fallbackArtists }, fallbackArtwork);
+    const listSource = source ?? { title: 'Songs', type: 'playlist' };
+    const playable = tracks.filter((t) => !t.unavailable);
+    const target = tracks[i]!;
+    const playableIndex = playable.findIndex((t) => t.videoId === target.videoId);
+    return playList(playable, Math.max(0, playableIndex), { source: listSource, fallbackArtwork, fallbackArtists });
   };
   const container = useRef<HTMLDivElement>(null);
   const [scrollElement, setScrollElement] = useState<HTMLElement | null>(null);

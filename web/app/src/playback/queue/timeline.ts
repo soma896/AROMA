@@ -31,6 +31,8 @@ export interface QueueEntry {
   track: Track;
   tier: QueueTier;
   source: QueueSource | null;
+  /** Index in the original playlist/album sequence when added. */
+  originalIndex?: number;
 }
 
 /** Past this point in a track, back restarts it instead of going to the previous one (QueueSections.kt). */
@@ -39,8 +41,14 @@ export const BACK_RESTARTS_AFTER_SEC = 10;
 let counter = 0;
 const newEntryId = () => `${Date.now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
-export function asEntry(track: Track, tier: QueueTier, source: QueueSource | null, entryId?: string): QueueEntry {
-  return { entryId: entryId ?? newEntryId(), track, tier, source };
+export function asEntry(
+  track: Track,
+  tier: QueueTier,
+  source: QueueSource | null,
+  entryId?: string,
+  originalIndex?: number,
+): QueueEntry {
+  return { entryId: entryId ?? newEntryId(), track, tier, source, originalIndex };
 }
 
 function upcomingUserQueue(timeline: readonly QueueEntry[], currentIndex: number): QueueEntry[] {
@@ -63,7 +71,7 @@ export function buildContextQueue(
 ): { timeline: QueueEntry[]; startIndex: number } {
   if (!tracks.length) return { timeline: [], startIndex: 0 };
   const kept = upcomingUserQueue(current, currentIndex);
-  const entries = tracks.map((t) => asEntry(t, 'context', source));
+  const entries = tracks.map((t, i) => asEntry(t, 'context', source, undefined, i));
   const at = Math.min(Math.max(selectedIndex, 0), entries.length - 1);
   return {
     timeline: [...entries.slice(0, at), entries[at]!, ...kept, ...entries.slice(at + 1)],

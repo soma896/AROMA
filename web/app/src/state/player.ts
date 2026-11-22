@@ -520,10 +520,21 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   previous() {
     const { index, queue, repeat } = get();
     const audio = getAudio();
-    if (audio && audio.currentTime > BACK_RESTARTS_AFTER_SEC) return get().seek(0);
-    if (index > 0) void startAt(index - 1);
-    else if (repeat === 'all' && queue.length > 1) void startAt(queue.length - 1);
-    else return get().seek(0);
+    if (audio && audio.currentTime > 3) return get().seek(0);
+    if (index > 0) {
+      void startAt(index - 1);
+    } else if (repeat === 'all' && queue.length > 0) {
+      let lastContextIdx = -1;
+      for (let i = queue.length - 1; i >= 0; i--) {
+        if (queue[i]!.tier === 'context') {
+          lastContextIdx = i;
+          break;
+        }
+      }
+      void startAt(lastContextIdx >= 0 ? lastContextIdx : queue.length - 1);
+    } else {
+      return get().seek(0);
+    }
     intent();
   },
 
@@ -569,15 +580,31 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
       const order = shuffledUpcomingOrder(upcoming.map((e) => e.tier));
       set({ shuffle: true, queue: [...head, ...order.map((i) => upcoming[i]!)] });
     } else {
-      // Back to the order the queue had, by section; tracks added since keep their place at the end.
-      const known = canonical ?? new Map<string, number>();
-      const restored = upcoming
-        .map((entry, i) => ({ i, at: known.get(entry.entryId) ?? Number.MAX_SAFE_INTEGER - upcoming.length + i }))
-        .sort((a, b) => a.at - b.at)
-        .map((x) => x.i);
-      const order = sectionedOrder(restored, upcoming.map((e) => e.tier));
+      // Restore original playlist order:
+      const curEntry = queue[index];
+      const curOrig = curEntry?.originalIndex ?? -1;
+
+      const userUpcoming = upcoming.filter((e) => e.tier === 'user');
+      const autoplayUpcoming = upcoming.filter((e) => e.tier === 'autoplay');
+      const contextUpcoming = upcoming.filter((e) => e.tier === 'context');
+
+      // Sort context tracks by original index:
+      // Tracks after the current track in the original sequence come first,
+      // followed by any earlier tracks (for wrap-around / repeat)
+      const afterCur = contextUpcoming
+        .filter((e) => e.originalIndex !== undefined && e.originalIndex > curOrig)
+        .sort((a, b) => (a.originalIndex ?? 0) - (b.originalIndex ?? 0));
+      const beforeCur = contextUpcoming
+        .filter((e) => e.originalIndex === undefined || e.originalIndex <= curOrig)
+        .sort((a, b) => (a.originalIndex ?? 0) - (b.originalIndex ?? 0));
+
+      const restoredContext = [...afterCur, ...beforeCur];
+
       canonical = null;
-      set({ shuffle: false, queue: [...head, ...order.map((i) => upcoming[i]!)] });
+      set({
+        shuffle: false,
+        queue: [...head, ...userUpcoming, ...restoredContext, ...autoplayUpcoming],
+      });
     }
     saveSettings(get());
   },
@@ -718,17 +745,42 @@ type NextPlan = { kind: 'repeat-one' } | { kind: 'index'; queue: QueueEntry[]; i
  * ending (repeat-one replays it); a Next tap moves on regardless.
  */
 function planNext(auto: boolean): NextPlan | null {
-  const { queue, index, repeat } = usePlayer.getState();
+  const { queue, index, repeat, autoplay } = usePlayer.getState();
   if (auto && repeat === 'one') return { kind: 'repeat-one' };
-  if (index + 1 < queue.length) return { kind: 'index', queue, index: index + 1 };
-  if (repeat !== 'off' && queue.length) {
-    // Round again: the hand-queued tracks have had their turn; the context repeats.
-    const tiers = queue.map((e) => e.tier);
-    const played = new Set(playedUserQueueIndices(tiers, index));
-    const kept = queue.filter((e, i) => !played.has(i) && (e.tier !== 'user' || i > index));
-    return kept.length ? { kind: 'index', queue: kept, index: 0 } : null;
+  if (index < 0 || !queue.length) return null;
+
+  const currentEntry = queue[index];
+  const nextIndex = index + 1;
+  const nextEntry = queue[nextIndex];
+
+  // A context playlist/album reaches its end when there is no next track,
+  // or when the current track is 'context'/'user' and the next track is 'autoplay'.
+  const isContextEnd =
+    nextIndex >= queue.length ||
+    (currentEntry?.tier !== 'autoplay' && nextEntry?.tier === 'autoplay');
+
+  if (isContextEnd) {
+    if (repeat === 'all' && queue.length > 0) {
+      // Loop back to the beginning of the context (or index 0)
+      const firstContextIdx = queue.findIndex((e) => e.tier === 'context');
+      const targetIdx = firstContextIdx >= 0 ? firstContextIdx : 0;
+      return { kind: 'index', queue, index: targetIdx };
+    }
+    if (repeat === 'one') {
+      return { kind: 'repeat-one' };
+    }
+    // repeat is 'off':
+    if (!autoplay) {
+      // Stop playback at the end of the playlist
+      return null;
+    }
+    if (nextEntry && nextEntry.tier === 'autoplay') {
+      return { kind: 'index', queue, index: nextIndex };
+    }
+    return null;
   }
-  return null;
+
+  return { kind: 'index', queue, index: nextIndex };
 }
 
 async function advance(auto: boolean): Promise<void> {
@@ -792,6 +844,14 @@ function refillAutoplay(force = false, anySeed = false): Promise<void> {
   if (!autoplay || repeat !== 'off' || index < 0) return Promise.resolve();
   // A party's AutoPlay goes through the server (party/partySync.ts), never straight onto this queue.
   if (partyHooks?.inParty()) return Promise.resolve();
+
+  // If there are still upcoming context tracks in the playlist,
+  // do not poll and append autoplay radio tracks until the playlist nears its end
+  const remainingContext = queue.slice(index + 1).filter((e) => e.tier === 'context').length;
+  if (remainingContext > 0 && !force) {
+    return Promise.resolve();
+  }
+
   const needed = MAX_QUEUED_AUTOPLAY - queue.slice(index + 1).filter((e) => e.tier === 'autoplay').length;
   if (needed <= 0) return Promise.resolve();
   // Seeded from the playing track (loadAutoplayForCurrentTrack), not the queue's tail.
