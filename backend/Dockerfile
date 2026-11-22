@@ -19,6 +19,7 @@ RUN apk add --no-cache ca-certificates tzdata && \
 
 WORKDIR /app
 COPY --from=builder /app/aroma-jam /app/aroma-jam
+RUN chmod +x /app/aroma-jam && chown -R aroma:aroma /app
 
 USER aroma
 
