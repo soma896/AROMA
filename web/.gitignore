@@ -5,5 +5,5 @@ dist/
 *.tsbuildinfo
 .env.local
 
-# Built extension zips (web/extension: pnpm package)
-app/public/downloads/
+# Built extension zips are tracked in repo so static site host serves them without needing wxt during deploy
+!app/public/downloads/

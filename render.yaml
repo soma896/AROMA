@@ -20,7 +20,7 @@ services:
     name: aroma-web-player
     runtime: static
     rootDir: web
-    buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @aroma/app build
+    buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @bitchord/extension package && pnpm --filter @aroma/app build
     staticPublishPath: ./app/dist
     routes:
       - type: rewrite

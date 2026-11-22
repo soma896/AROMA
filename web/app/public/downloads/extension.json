@@ -1,0 +1,8 @@
+{
+  "version": "0.4.4",
+  "builtAt": "2026-11-22T14:34:10.841Z",
+  "files": {
+    "chrome": "aroma-extension-chrome (0.4.4).zip",
+    "firefox": "aroma-extension-firefox (0.4.4).zip"
+  }
+}
