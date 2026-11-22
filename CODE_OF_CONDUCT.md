@@ -15,8 +15,8 @@ The following behaviors are unacceptable within the project:
 - Unwelcome sexual attention, advances, or inappropriate language.
 
 ## Reporting
-If you experience or witness unacceptable behavior, report it privately to the project maintainer:
-- Email: `kushagrasinghx@gmail.com`
+If you experience or witness unacceptable behavior, report it privately to the project maintainer via GitHub issues or email:
+- Project repository: https://github.com/soma896/AROMA
 
 Reports will be handled privately and with appropriate discretion.
 
