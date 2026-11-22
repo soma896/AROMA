@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Music } from 'lucide-react';
 import { useBestPart } from '@/playback/bestpart/useBestPart';
+import { getAudio } from '@/state/player';
 import {
   BackwardIcon,
   ForwardIcon,
@@ -34,6 +35,8 @@ export function PlayerBar() {
   const toggleSidePanel = useUi((s) => s.toggleSidePanel);
   const setFullScreen = useUi((s) => s.setFullScreen);
   const jumpToBestPart = useBestPart((s) => s.jumpToBestPart);
+  const metadata = useBestPart((s) => s.metadata);
+  const heardTracks = useBestPart((s) => s.heardTracks);
   const hasTrack = usePlayer((s) => s.nowPlaying !== null);
   const nowPlaying = usePlayer((s) => s.nowPlaying);
   const videoId = usePlayer((s) => s.nowPlaying?.videoId ?? null);
@@ -48,6 +51,20 @@ export function PlayerBar() {
   const repeat = usePlayer((s) => s.repeat);
   const { togglePlay, next, previous, toggleShuffle, cycleRepeat } = usePlayer.getState();
   const [volumeOpen, setVolumeOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const isHeard = videoId ? !!heardTracks[videoId] : false;
+  const startSec = metadata?.songId === videoId ? metadata.startSec : 0;
+
+  useEffect(() => {
+    const audio = getAudio();
+    if (!audio) return;
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    return () => audio.removeEventListener('timeupdate', onTimeUpdate);
+  }, []);
+
+  const isBestPartVisible = startSec > 0 && currentTime < startSec - 0.4 && !isHeard;
 
   return (
     <>
@@ -100,14 +117,16 @@ export function PlayerBar() {
         >
           <FavoriteButton videoId={videoId} className={fading} />
           {track && <TrackMenu track={track} className={fading} placement="above-end" />}
-          <button
-            className={`${fading} text-purple-300 hover:text-white`}
-            aria-label="Best Part"
-            title="Jump to Best Part"
-            onClick={() => void jumpToBestPart()}
-          >
-            <Music size={16} />
-          </button>
+          {isBestPartVisible && (
+            <button
+              className={`${fading} text-purple-300 hover:text-white`}
+              aria-label="Best Part"
+              title="Jump to Best Part"
+              onClick={() => void jumpToBestPart()}
+            >
+              <Music size={16} />
+            </button>
+          )}
           {/* Always here: the panel itself says whether this track has lyrics, and from where. */}
           <button className={fading} aria-label="Lyrics" aria-pressed={sidePanel === 'lyrics'} onClick={() => toggleSidePanel('lyrics')}>
             {sidePanel === 'lyrics' ? <LyricsActiveIcon size={18} /> : <LyricsIcon size={18} />}
@@ -144,15 +163,17 @@ export function PlayerBar() {
           </div>
         </div>
         <div className="flex items-center gap-1.5 flex-none">
-          <button
-            type="button"
-            className="flex h-7 items-center gap-1 rounded-full border border-white/30 bg-[#8b5cf6]/30 px-2.5 text-[11px] font-bold text-white shadow-sm hover:bg-[#8b5cf6]/40 active:scale-95 transition-all"
-            onClick={() => void jumpToBestPart()}
-            aria-label="Best Part"
-          >
-            <Music size={11} strokeWidth={2.5} />
-            Best Part
-          </button>
+          {isBestPartVisible && (
+            <button
+              type="button"
+              className="flex h-7 items-center gap-1 rounded-full border border-white/30 bg-[#8b5cf6]/30 px-2.5 text-[11px] font-bold text-white shadow-sm hover:bg-[#8b5cf6]/40 active:scale-95 transition-all"
+              onClick={() => void jumpToBestPart()}
+              aria-label="Best Part"
+            >
+              <Music size={11} strokeWidth={2.5} />
+              Best Part
+            </button>
+          )}
           <button
             type="button"
             className="grid size-8 place-items-center rounded-full text-white hover:bg-white/10 active:scale-95"

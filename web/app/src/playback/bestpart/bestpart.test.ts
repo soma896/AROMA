@@ -194,6 +194,8 @@ describe('Best Part Player Interaction & Seeking', () => {
         artist: 'Keeravani',
         durationSec: 240,
         artworkUrl: null,
+        streamInfo: null,
+        stream: null,
       },
       status: 'playing',
     });
@@ -210,43 +212,34 @@ describe('Best Part Player Interaction & Seeking', () => {
     const jumped = await useBestPart.getState().jumpToBestPart();
     expect(jumped).toBe(true);
     expect(seekSpy).toHaveBeenCalledWith(64.5);
+    // Button is marked heard so it disappears
+    expect(useBestPart.getState().heardTracks['song_demo_best']).toBe(true);
+    // Does not show popups / notifications
+    expect(useBestPart.getState().notification).toBeNull();
 
     // Clicking again jumps back to the same start timestamp
     await useBestPart.getState().jumpToBestPart();
     expect(seekSpy).toHaveBeenLastCalledWith(64.5);
   });
 
-  it('does not jump to random timestamp if Best Part is unverified', async () => {
+  it('marks track as heard and does not display any toast or popups on click', async () => {
     usePlayer.setState({
       nowPlaying: {
-        videoId: 'song_unverified',
-        title: 'Unverified Song',
-        artist: 'Unknown',
-        durationSec: 180,
+        videoId: 'song_clean_jump',
+        title: 'Song Clean Jump',
+        artist: 'Artist',
+        durationSec: 200,
         artworkUrl: null,
+        streamInfo: null,
+        stream: null,
       },
       status: 'playing',
     });
 
-    // Save unverified metadata
-    await saveBestPart({
-      songId: 'song_unverified',
-      startSec: 40,
-      endSec: 70,
-      verified: false,
-      method: 'ai',
-      confidence: 0.6,
-    });
-
-    await useBestPart.getState().loadForSong('song_unverified', 180);
-
-    const seekSpy = vi.spyOn(usePlayer.getState(), 'seek');
-
+    await useBestPart.getState().loadForSong('song_clean_jump', 200);
     const jumped = await useBestPart.getState().jumpToBestPart();
-    // Must NOT jump without verification
-    expect(jumped).toBe(false);
-    expect(seekSpy).not.toHaveBeenCalled();
-    // Opens admin modal so user can review/verify
-    expect(useBestPart.getState().adminModalOpen).toBe(true);
+    expect(jumped).toBe(true);
+    expect(useBestPart.getState().heardTracks['song_clean_jump']).toBe(true);
+    expect(useBestPart.getState().notification).toBeNull();
   });
 });

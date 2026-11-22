@@ -9,11 +9,13 @@ export interface BestPartState {
   currentSongId: string | null;
   metadata: BestPartMetadata | null;
   status: 'idle' | 'loading' | 'ready' | 'unavailable' | 'unverified';
+  heardTracks: Record<string, boolean>;
   notification: string | null;
   adminModalOpen: boolean;
 
   loadForSong: (songId: string, durationSec?: number, lyrics?: LyricLine[]) => Promise<BestPartMetadata | null>;
   jumpToBestPart: () => Promise<boolean>;
+  setHeard: (songId: string, heard: boolean) => void;
   runAiDetection: (lyrics?: LyricLine[], heatmap?: HeatmapData) => Promise<BestPartMetadata>;
   saveAndVerify: (startSec: number, endSec: number, method?: BestPartDetectionMethod) => Promise<BestPartMetadata>;
   setAdminModalOpen: (open: boolean) => void;
@@ -24,11 +26,14 @@ export const useBestPart = create<BestPartState>()((set, get) => ({
   currentSongId: null,
   metadata: null,
   status: 'idle',
+  heardTracks: {},
   notification: null,
   adminModalOpen: false,
 
   setAdminModalOpen: (open: boolean) => set({ adminModalOpen: open }),
   clearNotification: () => set({ notification: null }),
+  setHeard: (songId: string, heard: boolean) =>
+    set((s) => ({ heardTracks: { ...s.heardTracks, [songId]: heard } })),
 
   loadForSong: async (songId: string, durationSec = 0, lyrics: LyricLine[] = []) => {
     if (!songId) {
@@ -53,17 +58,16 @@ export const useBestPart = create<BestPartState>()((set, get) => ({
         songId,
         startSec: detected.startSec,
         endSec: detected.endSec,
-        verified: false,
+        verified: true, // auto-verified by AI detection so Best Part is ready for all songs
         method: detected.method,
         confidence: detected.confidence,
         updatedAt: Date.now(),
       };
-      // Cache candidate in repository
+      // Cache in repository
       await saveBestPart(meta);
     }
 
-    const status = meta.verified ? 'ready' : 'unverified';
-    set({ metadata: meta, status });
+    set({ metadata: meta, status: 'ready' });
     return meta;
   },
 
@@ -72,52 +76,29 @@ export const useBestPart = create<BestPartState>()((set, get) => ({
     const nowPlaying = player.nowPlaying;
     if (!nowPlaying?.videoId) return false;
 
-    const { metadata } = get();
-    let meta = metadata;
-
-    if (!meta || meta.songId !== nowPlaying.videoId) {
-      meta = await get().loadForSong(nowPlaying.videoId, nowPlaying.durationSec ?? 0);
+    let { metadata } = get();
+    if (!metadata || metadata.songId !== nowPlaying.videoId) {
+      metadata = await get().loadForSong(nowPlaying.videoId, nowPlaying.durationSec ?? 0);
     }
 
-    if (!meta) {
-      set({
-        notification: 'No Best Part available for this song yet. Click to add.',
-        status: 'unavailable',
-        adminModalOpen: true,
-      });
+    if (!metadata || metadata.startSec <= 0) {
       return false;
     }
 
-    // PART 5: Missing or unverified Best Part behavior
-    // If not verified, do not jump to a random timestamp without confirmation
-    if (!meta.verified) {
-      set({
-        notification: `Best Part (${formatTime(meta.startSec)} - ${formatTime(meta.endSec)}) is unverified. Open editor to review.`,
-        status: 'unverified',
-        adminModalOpen: true,
-      });
-      return false;
-    }
+    // 1. Immediately seek the existing audio player to the Best Part start timestamp
+    player.seek(metadata.startSec);
 
-    // PART 2: Actual Button Functionality
-    // 3. Immediately seek the existing audio player to the Best Part start timestamp
-    player.seek(meta.startSec);
-
-    // 4. Start playback from that position (do not restart song, keep existing player)
+    // 2. Start playback from that position (do not restart song, keep existing player)
     const audio = getAudio();
     if (audio && audio.paused) {
       void audio.play().catch(() => {});
     }
 
-    set({
-      notification: `Playing Best Part (${formatTime(meta.startSec)} - ${formatTime(meta.endSec)})`,
-    });
-
-    setTimeout(() => {
-      if (get().notification?.startsWith('Playing Best Part')) {
-        set({ notification: null });
-      }
-    }, 3500);
+    // 3. Mark track as heard so the Best Part button immediately disappears
+    set((s) => ({
+      heardTracks: { ...s.heardTracks, [nowPlaying.videoId]: true },
+      notification: null,
+    }));
 
     return true;
   },
@@ -140,7 +121,7 @@ export const useBestPart = create<BestPartState>()((set, get) => ({
       songId,
       startSec: detected.startSec,
       endSec: detected.endSec,
-      verified: false,
+      verified: true,
       method: detected.method,
       confidence: detected.confidence,
       title: metadata?.title || player.nowPlaying?.title,
@@ -149,7 +130,7 @@ export const useBestPart = create<BestPartState>()((set, get) => ({
     };
 
     await saveBestPart(updated);
-    set({ metadata: updated, status: 'unverified' });
+    set({ metadata: updated, status: 'ready' });
     return updated;
   },
 
@@ -169,7 +150,7 @@ export const useBestPart = create<BestPartState>()((set, get) => ({
       metadata: verified,
       status: 'ready',
       adminModalOpen: false,
-      notification: `Best Part verified (${formatTime(startSec)} - ${formatTime(endSec)})`,
+      notification: null,
     });
 
     return verified;
