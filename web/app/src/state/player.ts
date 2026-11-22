@@ -760,7 +760,7 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
 }));
 
 // For browser-driven tests, next to __bcAudio.
-if (import.meta.env.DEV) {
+if (import.meta.env.DEV && typeof window !== 'undefined') {
   Object.assign(window, {
     __bcPlayer: usePlayer,
     // AutoMix's analysis self-test: expect BPM ≈ 123.93 and Camelot 8A.

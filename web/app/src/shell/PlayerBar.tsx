@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Music } from 'lucide-react';
+import { useBestPart } from '@/playback/bestpart/useBestPart';
 import {
   BackwardIcon,
   ForwardIcon,
@@ -30,7 +32,10 @@ const fading = `${action} ${fadeForVolume}`;
 export function PlayerBar() {
   const sidePanel = useUi((s) => s.sidePanel);
   const toggleSidePanel = useUi((s) => s.toggleSidePanel);
+  const setFullScreen = useUi((s) => s.setFullScreen);
+  const jumpToBestPart = useBestPart((s) => s.jumpToBestPart);
   const hasTrack = usePlayer((s) => s.nowPlaying !== null);
+  const nowPlaying = usePlayer((s) => s.nowPlaying);
   const videoId = usePlayer((s) => s.nowPlaying?.videoId ?? null);
   // The queue's entry for what's playing: the track menu needs the full track.
   const track = usePlayer((s) => {
@@ -45,7 +50,8 @@ export function PlayerBar() {
   const [volumeOpen, setVolumeOpen] = useState(false);
 
   return (
-    // The side panel overlays the page; the pill re-centres in what's left.
+    <>
+      {/* The side panel overlays the page; the pill re-centres in what's left. */}
     <div
       className="pointer-events-none absolute right-0 bottom-(--player-bottom-offset) left-(--web-navigation-width) z-[calc(var(--z-web-chrome)-1)] flex justify-center px-5 transition-[padding-inline-end] duration-(--duration-panel) ease-panel data-[panel-open=true]:pe-[calc(var(--side-panel-width)+20px)] max-sm:hidden"
       data-panel-open={sidePanel !== null}
@@ -94,6 +100,14 @@ export function PlayerBar() {
         >
           <FavoriteButton videoId={videoId} className={fading} />
           {track && <TrackMenu track={track} className={fading} placement="above-end" />}
+          <button
+            className={`${fading} text-purple-300 hover:text-white`}
+            aria-label="Best Part"
+            title="Jump to Best Part"
+            onClick={() => void jumpToBestPart()}
+          >
+            <Music size={16} />
+          </button>
           {/* Always here: the panel itself says whether this track has lyrics, and from where. */}
           <button className={fading} aria-label="Lyrics" aria-pressed={sidePanel === 'lyrics'} onClick={() => toggleSidePanel('lyrics')}>
             {sidePanel === 'lyrics' ? <LyricsActiveIcon size={18} /> : <LyricsIcon size={18} />}
@@ -110,5 +124,46 @@ export function PlayerBar() {
         </div>
       </div>
     </div>
+    {/* Mobile compact player bar */}
+    {hasTrack && (
+      <div className="pointer-events-auto fixed inset-x-2.5 bottom-3 z-[calc(var(--z-web-chrome)-1)] hidden max-sm:flex items-center justify-between rounded-2xl border border-white/10 bg-[#161622]/90 p-2 shadow-2xl backdrop-blur-xl">
+        <div
+          className="flex flex-1 min-w-0 items-center gap-2.5 cursor-pointer pr-2"
+          onClick={() => setFullScreen(true)}
+        >
+          {nowPlaying?.artworkUrl && (
+            <img
+              src={nowPlaying.artworkUrl}
+              alt=""
+              className="size-10 rounded-lg object-cover flex-none shadow-sm"
+            />
+          )}
+          <div className="flex flex-col min-w-0">
+            <span className="truncate text-xs font-semibold text-white">{nowPlaying?.title}</span>
+            <span className="truncate text-[11px] text-white/60">{nowPlaying?.artist}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 flex-none">
+          <button
+            type="button"
+            className="flex h-7 items-center gap-1 rounded-full border border-white/30 bg-[#8b5cf6]/30 px-2.5 text-[11px] font-bold text-white shadow-sm hover:bg-[#8b5cf6]/40 active:scale-95 transition-all"
+            onClick={() => void jumpToBestPart()}
+            aria-label="Best Part"
+          >
+            <Music size={11} strokeWidth={2.5} />
+            Best Part
+          </button>
+          <button
+            type="button"
+            className="grid size-8 place-items-center rounded-full text-white hover:bg-white/10 active:scale-95"
+            onClick={togglePlay}
+            aria-label={playing ? 'Pause' : 'Play'}
+          >
+            {playing ? <PauseIcon size={20} /> : <PlayIcon size={20} />}
+          </button>
+        </div>
+      </div>
+    )}
+  </>
   );
 }

@@ -30,6 +30,9 @@ func setupTestServer() *httptest.Server {
 	mux.HandleFunc("POST /api/parties/{code}/join", handleJoinParty)
 	mux.HandleFunc("GET /api/parties/{code}", handleGetParty)
 	mux.HandleFunc("POST /api/parties/{code}/leave", handleLeaveParty)
+	mux.HandleFunc("GET /api/best-part/{songId}", handleGetBestPart)
+	mux.HandleFunc("POST /api/best-part/{songId}", handleSaveBestPart)
+	mux.HandleFunc("GET /api/best-parts", handleListBestParts)
 	mux.HandleFunc("POST /api/presence", handlePresence)
 	mux.HandleFunc("GET /api/stats/live", handleLiveStats)
 	mux.HandleFunc("GET /api/stats/live/badge.svg", handleLiveBadge)
@@ -573,5 +576,60 @@ func TestProxyCORSHeaders(t *testing.T) {
 	origins := resp.Header.Values("Access-Control-Allow-Origin")
 	if len(origins) != 1 || origins[0] != "*" {
 		t.Fatalf("Expected exactly one Access-Control-Allow-Origin: *, got %v", origins)
+	}
+}
+
+func TestBestPartEndpoints(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	// 1. Initial GET on non-existent song should return 404
+	res404, err := http.Get(ts.URL + "/api/best-part/unknown_song")
+	if err != nil || res404.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 for unknown song, got %v, err %v", res404.StatusCode, err)
+	}
+
+	// 2. POST save best part
+	body := map[string]interface{}{
+		"startSec":   42.5,
+		"endSec":     72.5,
+		"verified":   true,
+		"method":     "ai",
+		"confidence": 0.92,
+		"title":      "Paddanandi",
+		"artist":     "Udit Narayan, Chitra",
+	}
+	b, _ := json.Marshal(body)
+	saveRes, err := http.Post(ts.URL+"/api/best-part/song_paddanandi", "application/json", bytes.NewReader(b))
+	if err != nil || saveRes.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/best-part/song_paddanandi failed: status %v, err %v", saveRes.StatusCode, err)
+	}
+
+	var saved map[string]interface{}
+	_ = json.NewDecoder(saveRes.Body).Decode(&saved)
+	if saved["songId"] != "song_paddanandi" || saved["startSec"] != 42.5 || saved["verified"] != true {
+		t.Fatalf("unexpected save response: %+v", saved)
+	}
+
+	// 3. GET saved song
+	getRes, err := http.Get(ts.URL + "/api/best-part/song_paddanandi")
+	if err != nil || getRes.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/best-part/song_paddanandi failed: status %v", getRes.StatusCode)
+	}
+	var fetched map[string]interface{}
+	_ = json.NewDecoder(getRes.Body).Decode(&fetched)
+	if fetched["startSec"] != 42.5 || fetched["endSec"] != 72.5 || fetched["verified"] != true {
+		t.Fatalf("unexpected fetched response: %+v", fetched)
+	}
+
+	// 4. GET /api/best-parts
+	listRes, err := http.Get(ts.URL + "/api/best-parts")
+	if err != nil || listRes.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/best-parts failed: status %v", listRes.StatusCode)
+	}
+	var listResp map[string]interface{}
+	_ = json.NewDecoder(listRes.Body).Decode(&listResp)
+	if count, ok := listResp["count"].(float64); !ok || count < 1 {
+		t.Fatalf("expected at least 1 item in list, got %v", listResp["count"])
 	}
 }

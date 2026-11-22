@@ -19,6 +19,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/soma896/AROMA/backend/bestpart"
 	"github.com/soma896/AROMA/backend/clock"
 	"github.com/soma896/AROMA/backend/codes"
 	"github.com/soma896/AROMA/backend/config"
@@ -38,6 +39,7 @@ const (
 var (
 	store    = party.NewPartyStore()
 	hubInst  = hub.NewHub()
+	bestPartStore = bestpart.NewStore()
 	createLimiter = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
 	presenceTracker = presence.NewTracker(
 		time.Duration(config.PresenceIntervalSec+config.PresenceGraceSec)*time.Second,
@@ -70,6 +72,11 @@ func main() {
 	mux.HandleFunc("GET /api/parties/{code}", handleGetParty)
 	mux.HandleFunc("GET /api/parties/{code}/preview", handlePreviewParty)
 	mux.HandleFunc("POST /api/parties/{code}/leave", handleLeaveParty)
+
+	// Best Part endpoints
+	mux.HandleFunc("GET /api/best-part/{songId}", handleGetBestPart)
+	mux.HandleFunc("POST /api/best-part/{songId}", handleSaveBestPart)
+	mux.HandleFunc("GET /api/best-parts", handleListBestParts)
 
 	// Open-app counter
 	mux.HandleFunc("POST /api/presence", handlePresence)
@@ -698,6 +705,51 @@ func handleLeaveParty(w http.ResponseWriter, r *http.Request) {
 	hubInst.Broadcast(p.Code, membersFrame, memberId)
 
 	jsonResponse(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func handleGetBestPart(w http.ResponseWriter, r *http.Request) {
+	songId := strings.TrimSpace(r.PathValue("songId"))
+	if songId == "" {
+		jsonError(w, http.StatusBadRequest, "invalid_song_id", "songId parameter is required")
+		return
+	}
+	m, ok := bestPartStore.Get(songId)
+	if !ok {
+		jsonError(w, http.StatusNotFound, "not_found", "No Best Part found for this song")
+		return
+	}
+	jsonResponse(w, http.StatusOK, m)
+}
+
+func handleSaveBestPart(w http.ResponseWriter, r *http.Request) {
+	songId := strings.TrimSpace(r.PathValue("songId"))
+	if songId == "" {
+		jsonError(w, http.StatusBadRequest, "invalid_song_id", "songId parameter is required")
+		return
+	}
+	var m bestpart.Metadata
+	if !decodeJSONBody(w, r, &m) {
+		return
+	}
+	m.SongId = songId
+	if m.EndSec > 0 && m.EndSec <= m.StartSec {
+		jsonError(w, http.StatusBadRequest, "invalid_timestamps", "endSec must be greater than startSec")
+		return
+	}
+	if m.Method == "" {
+		m.Method = "manual"
+	}
+	m.UpdatedAt = time.Now().Unix()
+	bestPartStore.Set(&m)
+	jsonResponse(w, http.StatusOK, m)
+}
+
+func handleListBestParts(w http.ResponseWriter, r *http.Request) {
+	items := bestPartStore.List()
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"items": items,
+		"count": len(items),
+	})
 }
 
 // Web Invite Landing Handler

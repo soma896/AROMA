@@ -28,6 +28,7 @@ import { Credits, PageLink, pageLink } from './Lcd';
 import { LyricsPanel } from './LyricsPanel';
 import { MeshBackdrop } from './MeshBackdrop';
 import { albumPageFor } from './nowPlayingLinks';
+import { BestPartButton } from './BestPartButton';
 import { UpNext } from './UpNext';
 import { MixWindowHighlight, NerdStats } from './NerdStats';
 import { useScrubber } from './useScrubber';
@@ -334,6 +335,13 @@ export function FullScreenPlayer() {
             )}
             {video && !theater && <VideoSurface className="absolute inset-0" />}
           </div>
+
+          {/* Exact Best Part pill button from reference screenshot, centered below album artwork */}
+          {!theater && (
+            <div className="flex justify-center mt-3 mb-1">
+              <BestPartButton />
+            </div>
+          )}
 
           <div className={`flex items-center gap-3${theater ? '' : ' mt-[clamp(20px,3.2vh,32px)]'}${column ? ' max-md:mt-0' : ''}`}>
             {/* As the mini player's: the title opens the album, each credited name its artist. */}
