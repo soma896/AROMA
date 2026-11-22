@@ -20,7 +20,7 @@ import uuid
 import websockets
 from urllib.request import Request, urlopen
 
-DEFAULT_SERVER = "http://localhost:8000"
+DEFAULT_SERVER = "http://localhost:9000"
 
 
 def post(url, body):

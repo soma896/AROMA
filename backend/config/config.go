@@ -87,16 +87,16 @@ var (
 	// Render Free has 0.1 CPU. Fifty rooms (at most 250 sockets) is a safe
 	// starting ceiling; raise it only after measuring CPU and memory usage.
 	MaxParties           = getInt("JAM_MAX_PARTIES", 50)
-	CreateRatePerMinute  = getInt("JAM_CREATE_RATE_PER_MINUTE", 2)
+	CreateRatePerMinute  = getInt("JAM_CREATE_RATE_PER_MINUTE", 10)
 	RateLimitMaxEntries  = getInt("JAM_RATE_LIMIT_MAX_ENTRIES", 10000)
 	RequestMaxBytes      = int64(getInt("JAM_REQUEST_MAX_BYTES", 16*1024))
 	WebSocketMaxBytes    = int64(getInt("JAM_WEBSOCKET_MAX_BYTES", 16*1024))
 	ConnectionIdleMs     = int64(getInt("JAM_CONNECTION_IDLE_MS", 15*60*1000))
 	FrameRatePerSecond   = float64(getInt("JAM_FRAME_RATE_PER_SECOND", 30))
-	AllowedOrigins       = getCSV("JAM_ALLOWED_ORIGINS", "")
+	AllowedOrigins       = getCSV("JAM_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
 	TrustProxy           = getBool("JAM_TRUST_PROXY", false)
 	PublicOrigin         = getOrigin("JAM_PUBLIC_ORIGIN")
-	Port                 = getInt("PORT", 8000)
+	Port                 = getInt("PORT", 9000)
 )
 
 // Open-app heartbeats. The interval is handed back on every ping, so it can be

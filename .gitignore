@@ -55,3 +55,8 @@ dist/
 
 # Claude Code session files (launch configs, worktrees)
 .claude/
+
+# Go build artifacts & cache
+backend/.gocache/
+*.exe
+
