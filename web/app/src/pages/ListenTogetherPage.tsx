@@ -64,9 +64,8 @@ export default function ListenTogetherPage() {
 
 function SignInFirst() {
   return (
-    <p className={`${settingsUi.footer} mb-4`}>
-      Listen Together uses your YouTube Music account for your name and picture in the party. Sign in on music.youtube.com,
-      then come back.
+    <p className={`${settingsUi.footer} mb-4 text-secondary`}>
+      Tip: Sign in on music.youtube.com to sync your YouTube profile name and picture, or set a custom name below.
     </p>
   );
 }
@@ -94,7 +93,7 @@ function StartOrJoin({ signedIn }: { signedIn: boolean }) {
             <span>Start a Party</span>
             <span className={settingsUi.rowDetail}>Whatever you’re playing comes with you.</span>
           </span>
-          <button className={primary} disabled={!signedIn || create.isPending} onClick={() => create.mutate()}>
+          <button className={primary} disabled={create.isPending} onClick={() => create.mutate()}>
             {create.isPending ? 'Starting…' : 'Start'}
           </button>
         </div>
@@ -129,7 +128,7 @@ function StartOrJoin({ signedIn }: { signedIn: boolean }) {
           <span>Name in parties</span>
           <input
             className={settingsUi.input}
-            placeholder="Your YouTube name"
+            placeholder="Your party name (e.g. Aroma Fan)"
             value={settings.nickname}
             maxLength={80}
             onChange={(e) => update({ nickname: e.currentTarget.value })}
@@ -176,7 +175,7 @@ function InviteCard({ code, server, signedIn }: { code: string; server: string |
       {!signedIn && <SignInFirst />}
       <button
         className="mt-1.5 flex-none rounded-pill bg-key-bg px-7 py-2.5 type-title-3-emphasized text-white disabled:opacity-45"
-        disabled={!signedIn || join.isPending || data?.isFull || preview.isError}
+        disabled={join.isPending || data?.isFull || preview.isError}
         onClick={() => join.mutate()}
       >
         {data?.isFull ? 'This party is full' : join.isPending ? 'Joining…' : 'Tap to Join'}
