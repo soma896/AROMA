@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: aroma-party-server
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: backend
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 9000
+      - key: JAM_TRUST_PROXY
+        value: "true"
+      - key: JAM_ALLOWED_ORIGINS
+        value: "*"
