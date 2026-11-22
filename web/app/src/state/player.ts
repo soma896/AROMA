@@ -150,6 +150,49 @@ let decks: Deck[] | null = null;
 let decksPromise: Promise<Deck[]> | null = null;
 let active = 0;
 
+/**
+ * Inaudible audio session keep-alive.
+ * When the screen turns off on mobile (Android / iOS), browsers aggressively
+ * suspend background JavaScript execution if no audio is actively outputting
+ * to hardware (e.g. during track transitions). This inaudible silent oscillator
+ * keeps the OS audio session alive so the queue seamlessly advances even when
+ * the device screen is off.
+ */
+let bgAudioCtx: AudioContext | null = null;
+let bgOsc: OscillatorNode | null = null;
+
+function startBackgroundKeepAlive() {
+  if (typeof window === 'undefined') return;
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    if (!bgAudioCtx || bgAudioCtx.state === 'closed') {
+      bgAudioCtx = new Ctx();
+    }
+    if (bgAudioCtx.state === 'suspended') {
+      void bgAudioCtx.resume();
+    }
+    if (!bgOsc && bgAudioCtx) {
+      const osc = bgAudioCtx.createOscillator();
+      const gain = bgAudioCtx.createGain();
+      // Gain set to 0.00001 (completely inaudible, but prevents OS CPU sleep)
+      gain.gain.value = 0.00001;
+      osc.connect(gain);
+      gain.connect(bgAudioCtx.destination);
+      osc.start();
+      bgOsc = osc;
+    }
+  } catch {
+    // Web Audio may be restricted before user gesture
+  }
+}
+
+function pauseBackgroundKeepAlive() {
+  if (bgAudioCtx && bgAudioCtx.state === 'running') {
+    void bgAudioCtx.suspend().catch(() => {});
+  }
+}
+
 /** The audio element in front, if playback has started at least once. */
 export function getAudio(): HTMLAudioElement | null {
   return decks?.[active]?.audio ?? null;
@@ -187,6 +230,23 @@ function getDecks(): Promise<Deck[]> {
       // Media from another origin is silent inside an AudioContext unless it
       // is fetched with CORS (prompt §6, the Web Audio caveat).
       audio.crossOrigin = 'anonymous';
+      audio.setAttribute('playsinline', 'true');
+      audio.setAttribute('webkit-playsinline', 'true');
+      // Append to DOM so Android Chrome and mobile browsers grant active background media privileges
+      if (typeof document !== 'undefined' && document.body) {
+        audio.style.position = 'fixed';
+        audio.style.top = '-9999px';
+        audio.style.left = '-9999px';
+        audio.style.width = '1px';
+        audio.style.height = '1px';
+        audio.style.opacity = '0';
+        audio.style.pointerEvents = 'none';
+        try {
+          document.body.appendChild(audio);
+        } catch {
+          // Ignored if document.body isn't ready
+        }
+      }
       const engine = new YouTubeEngine(audio);
       const deck: Deck = { engine, audio, gain: 1 };
       engine.onFatal = (videoId, message) => {
@@ -576,18 +636,23 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
     if (!nowPlaying) return;
     const resuming = !audio || audio.paused || status === 'error';
     // A routed graph left suspended (no gesture when it was built) would play silence.
-    if (resuming) void graph?.ctx.resume();
+    if (resuming) {
+      startBackgroundKeepAlive();
+      void graph?.ctx.resume();
+    }
     // A listener in a party the host has locked: the press moves this device alone.
     if (partyHooks?.onLockedTransport(resuming)) return;
     if (!audio || status === 'error') {
       // A stopped or failed track starts again from where it was.
       void startAt(index, { startSec: audio?.currentTime ?? 0 });
     } else if (audio.paused) {
+      startBackgroundKeepAlive();
       // In a party, a resume waits for the instant the server schedules for everyone.
       if (!partyHooks?.shouldDeferPlay()) void audio.play().catch((e: unknown) => trackLog.w(`play() refused: ${String(e)}`));
     } else {
       cancelCrossfade();
       audio.pause();
+      pauseBackgroundKeepAlive();
     }
     intent();
   },
@@ -742,6 +807,7 @@ async function startAt(at: number, { startSec = 0, auto = false, autoplay = true
 
   usePlayer.setState({ index: at, nowPlaying: hintOf(entry.track), status: 'loading', error: null });
   updateMediaSession(usePlayer.getState().nowPlaying);
+  startBackgroundKeepAlive();
   try {
     const all = await getDecks();
     const deck = all[active]!;
@@ -1116,10 +1182,20 @@ function bindElement(deck: Deck, n: number) {
     });
   }
   element.addEventListener('play', () => {
-    if (inFront() && 'mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+    startBackgroundKeepAlive();
+    if (inFront() && 'mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+      updatePositionState();
+    }
   });
   element.addEventListener('pause', () => {
-    if (inFront() && 'mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+    if (inFront() && 'mediaSession' in navigator) {
+      const { status } = usePlayer.getState();
+      if (status !== 'loading' && status !== 'buffering') {
+        navigator.mediaSession.playbackState = 'paused';
+        pauseBackgroundKeepAlive();
+      }
+    }
   });
 }
 
@@ -1132,15 +1208,17 @@ function updateMediaSession(track: NowPlaying | null) {
   const session = navigator.mediaSession;
   if (!track) {
     session.metadata = null;
+    session.playbackState = 'none';
     return;
   }
   session.metadata = new MediaMetadata({
     title: track.title,
     artist: track.artist,
     artwork: track.artworkUrl
-      ? [96, 256, 512].map((px) => ({ src: artworkAtPixels(track.artworkUrl!, px), sizes: `${px}x${px}` }))
+      ? [96, 128, 192, 256, 384, 512].map((px) => ({ src: artworkAtPixels(track.artworkUrl!, px), sizes: `${px}x${px}`, type: 'image/jpeg' }))
       : [],
   });
+  session.playbackState = 'playing';
 
   if (handlersBound) return;
   handlersBound = true;
@@ -1173,11 +1251,29 @@ function updatePositionState() {
     navigator.mediaSession.setPositionState({
       duration: audio.duration,
       playbackRate: audio.playbackRate,
-      position: Math.min(audio.currentTime, audio.duration),
+      position: Math.min(Math.max(0, audio.currentTime), audio.duration),
     });
   } catch {
     // Position past duration during a seek; the next event corrects it.
   }
+}
+
+// Background playback and screen lock sync: keep alive during sleep, resync on wake
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    const { status } = usePlayer.getState();
+    if (document.visibilityState === 'hidden') {
+      if (status === 'playing' || status === 'buffering') {
+        startBackgroundKeepAlive();
+      }
+    } else if (document.visibilityState === 'visible') {
+      const audio = getAudio();
+      if (audio && (status === 'playing' || status === 'buffering') && audio.paused) {
+        audio.play().catch(() => {});
+      }
+      updatePositionState();
+    }
+  });
 }
 
 // ---- The party's door (party/partySync.ts): moves the player, reports nothing ----------
