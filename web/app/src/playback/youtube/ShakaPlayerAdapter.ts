@@ -29,6 +29,7 @@ import {
   headersToGenericObject,
   makeResponse
 } from './shakaHelpers';
+import { config } from '@/config';
 import { getBridge } from '@/extension/bridge';
 
 interface ShakaResponseArgs {
@@ -312,7 +313,8 @@ export class ShakaPlayerAdapter implements SabrPlayerAdapter {
 
       let fetchUri = uri;
       if (!getBridge() && uri.includes('googlevideo.com')) {
-        fetchUri = `/__googlevideo__?url=${encodeURIComponent(uri)}`;
+        const proxyBase = config.partyServerUrl ? config.partyServerUrl.replace(/\/$/, '') : '';
+        fetchUri = `${proxyBase}/__googlevideo__?url=${encodeURIComponent(uri)}`;
       }
       const response = await fetch(fetchUri, init);
       headersReceived(headersToGenericObject(response.headers));

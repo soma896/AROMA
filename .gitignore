@@ -59,4 +59,5 @@ dist/
 # Go build artifacts & cache
 backend/.gocache/
 *.exe
+*.exe~
 

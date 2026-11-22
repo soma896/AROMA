@@ -35,6 +35,9 @@ func setupTestServer() *httptest.Server {
 	mux.HandleFunc("GET /api/stats/live/badge.svg", handleLiveBadge)
 	mux.HandleFunc("GET /invite/{code}", handleInviteLanding)
 	mux.HandleFunc("GET /ws/parties/{code}", handleWebSocket)
+	mux.HandleFunc("/__yt_music__/", createYTProxy("https://music.youtube.com", "/__yt_music__"))
+	mux.HandleFunc("/__yt_www__/", createYTProxy("https://www.youtube.com", "/__yt_www__"))
+	mux.HandleFunc("/__googlevideo__", handleGoogleVideoProxy)
 
 	return httptest.NewServer(corsMiddleware(mux))
 }
@@ -548,5 +551,27 @@ func TestWebSocketTokenAsSubprotocol(t *testing.T) {
 	bad := websocket.Dialer{Subprotocols: []string{socketProtocol, socketTokenPrefix + "nottherighttoken"}}
 	if _, resp, err := bad.Dial(u.String(), nil); err == nil || resp == nil || resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("expected 401 for a wrong subprotocol token, got %v", err)
+	}
+}
+
+func TestProxyCORSHeaders(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	// 1. Test OPTIONS preflight on proxy
+	req, _ := http.NewRequest("OPTIONS", ts.URL+"/__yt_music__/youtubei/v1/browse", nil)
+	req.Header.Set("Origin", "https://aroma-web-player.onrender.com")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "content-type")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("OPTIONS request failed: %v", err)
+	}
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("Expected 204 for OPTIONS, got %d", resp.StatusCode)
+	}
+	origins := resp.Header.Values("Access-Control-Allow-Origin")
+	if len(origins) != 1 || origins[0] != "*" {
+		t.Fatalf("Expected exactly one Access-Control-Allow-Origin: *, got %v", origins)
 	}
 }

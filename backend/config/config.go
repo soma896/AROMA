@@ -63,11 +63,10 @@ func getOrigin(key string) string {
 	return val
 }
 
-// IsAllowedOrigin deliberately does not support a wildcard. Browser clients
-// must be explicitly named; native clients send no Origin header.
+// IsAllowedOrigin checks if the origin is permitted. Supports "*" as a wildcard.
 func IsAllowedOrigin(origin string) bool {
 	for _, allowed := range AllowedOrigins {
-		if origin == allowed {
+		if allowed == "*" || origin == allowed {
 			return true
 		}
 	}
@@ -93,7 +92,7 @@ var (
 	WebSocketMaxBytes    = int64(getInt("JAM_WEBSOCKET_MAX_BYTES", 16*1024))
 	ConnectionIdleMs     = int64(getInt("JAM_CONNECTION_IDLE_MS", 15*60*1000))
 	FrameRatePerSecond   = float64(getInt("JAM_FRAME_RATE_PER_SECOND", 30))
-	AllowedOrigins       = getCSV("JAM_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
+	AllowedOrigins       = getCSV("JAM_ALLOWED_ORIGINS", "https://aroma-web-player.onrender.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000")
 	TrustProxy           = getBool("JAM_TRUST_PROXY", false)
 	PublicOrigin         = getOrigin("JAM_PUBLIC_ORIGIN")
 	Port                 = getInt("PORT", 9000)

@@ -136,15 +136,27 @@ async function simpleRequestFetch(input: RequestInfo | URL, init?: RequestInit):
   const method = init?.method ?? request?.method ?? 'GET';
   const source = new Headers(init?.headers ?? request?.headers);
   const headers = new Headers();
-  source.forEach((value, key) => {
-    if (SAFELISTED.has(key.toLowerCase())) headers.set(key, value);
-  });
-
   let body: BodyInit | null | undefined = init?.body;
   if (body === undefined && request && method !== 'GET' && method !== 'HEAD') {
     body = await request.text();
   }
-  if (body != null) headers.set('Content-Type', 'text/plain;charset=UTF-8');
+
+  if (bridge) {
+    source.forEach((value, key) => {
+      if (SAFELISTED.has(key.toLowerCase())) headers.set(key, value);
+    });
+    if (body != null) headers.set('Content-Type', 'text/plain;charset=UTF-8');
+  } else {
+    source.forEach((value, key) => {
+      const lower = key.toLowerCase();
+      if (lower !== 'host' && lower !== 'cookie' && lower !== 'origin' && lower !== 'referer') {
+        headers.set(key, value);
+      }
+    });
+    if (body != null && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+  }
 
   return fetch(targetUrl, {
     method,

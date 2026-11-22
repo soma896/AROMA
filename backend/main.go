@@ -107,10 +107,10 @@ func main() {
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/__yt_") || strings.HasPrefix(r.URL.Path, "/__googlevideo__") {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
-			w.Header().Set("Access-Control-Allow-Headers", "*")
-			if r.Method == "OPTIONS" {
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
+				w.Header().Set("Access-Control-Allow-Headers", "*")
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
@@ -121,8 +121,8 @@ func corsMiddleware(next http.Handler) http.Handler {
 		if origin != "" && config.IsAllowedOrigin(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
 		}
 		if r.Method == "OPTIONS" {
 			if origin != "" && !config.IsAllowedOrigin(origin) {
@@ -311,10 +311,19 @@ func createYTProxy(originHost, prefix string) http.HandlerFunc {
 			req.Header.Del("Cookie")
 		},
 		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Del("Access-Control-Allow-Origin")
+			resp.Header.Del("Access-Control-Allow-Methods")
+			resp.Header.Del("Access-Control-Allow-Headers")
 			resp.Header.Set("Access-Control-Allow-Origin", "*")
 			resp.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
 			resp.Header.Set("Access-Control-Allow-Headers", "*")
 			return nil
+		},
+		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, err error) {
+			rw.Header().Set("Access-Control-Allow-Origin", "*")
+			rw.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
+			rw.Header().Set("Access-Control-Allow-Headers", "*")
+			http.Error(rw, fmt.Sprintf("Proxy error: %v", err), http.StatusBadGateway)
 		},
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -357,10 +366,19 @@ func handleGoogleVideoProxy(w http.ResponseWriter, r *http.Request) {
 			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 		},
 		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Del("Access-Control-Allow-Origin")
+			resp.Header.Del("Access-Control-Allow-Methods")
+			resp.Header.Del("Access-Control-Allow-Headers")
 			resp.Header.Set("Access-Control-Allow-Origin", "*")
 			resp.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
 			resp.Header.Set("Access-Control-Allow-Headers", "*")
 			return nil
+		},
+		ErrorHandler: func(rw http.ResponseWriter, req *http.Request, err error) {
+			rw.Header().Set("Access-Control-Allow-Origin", "*")
+			rw.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+			rw.Header().Set("Access-Control-Allow-Headers", "*")
+			http.Error(rw, fmt.Sprintf("Proxy error: %v", err), http.StatusBadGateway)
 		},
 	}
 	proxy.ServeHTTP(w, r)
