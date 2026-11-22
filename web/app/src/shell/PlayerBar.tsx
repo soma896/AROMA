@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Music } from 'lucide-react';
 import { useBestPart } from '@/playback/bestpart/useBestPart';
 import { getAudio } from '@/state/player';
+import { BestPartMusicIcon } from './BestPartButton';
 import {
   BackwardIcon,
   ForwardIcon,
@@ -124,7 +124,7 @@ export function PlayerBar() {
               title="Jump to Best Part"
               onClick={() => void jumpToBestPart()}
             >
-              <Music size={16} />
+              <BestPartMusicIcon className="size-4" />
             </button>
           )}
           {/* Always here: the panel itself says whether this track has lyrics, and from where. */}
@@ -166,11 +166,11 @@ export function PlayerBar() {
           {isBestPartVisible && (
             <button
               type="button"
-              className="flex h-7 items-center gap-1 rounded-full border border-white/30 bg-[#8b5cf6]/30 px-2.5 text-[11px] font-bold text-white shadow-sm hover:bg-[#8b5cf6]/40 active:scale-95 transition-all"
+              className="flex h-7 items-center gap-1.5 rounded-full border border-white/30 bg-white/[0.18] px-2.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-xl hover:bg-white/[0.24] active:scale-95 transition-all select-none"
               onClick={() => void jumpToBestPart()}
               aria-label="Best Part"
             >
-              <Music size={11} strokeWidth={2.5} />
+              <BestPartMusicIcon className="size-3 text-white" />
               Best Part
             </button>
           )}

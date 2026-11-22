@@ -1,9 +1,31 @@
-import { Music } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLyrics } from '@/lyrics/useLyrics';
 import { useBestPart } from '@/playback/bestpart/useBestPart';
 import { getAudio, usePlayer } from '@/state/player';
 import { BestPartAdminModal } from './BestPartAdminModal';
+
+/**
+ * Exact BitChord / Aroma beamed musical note vector icon.
+ * Matches BitChordIcons.MusicNote (SF Music Note) from the reference image.
+ */
+function BestPartMusicIcon({ className = 'size-4' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+      {/* Note heads */}
+      <ellipse cx="7.1" cy="17.7" rx="2.9" ry="2.5" />
+      <ellipse cx="17.1" cy="15.9" rx="2.9" ry="2.5" />
+      {/* Stems and top beam */}
+      <path
+        d="M10 17.7V6.7L20 4.9v11"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function BestPartButton() {
   const nowPlaying = usePlayer((s) => s.nowPlaying);
@@ -74,14 +96,15 @@ export function BestPartButton() {
         }`}
       >
         {/*
-          EXACT BUTTON DESIGN AS SPECIFIED IN REFERENCE SCREENSHOT & VIDEO:
+          EXACT BUTTON DESIGN AS PROVIDED IN USER'S CLOSE-UP IMAGE:
           - Rounded pill-shaped button.
-          - Translucent lavender/purple background.
-          - Thin white border.
-          - White music note icon.
-          - Bold white text: "Best Part".
+          - Translucent frosted glass background: bg-white/[0.18] (subtly transparent).
+          - Hairline translucent white rim: border border-white/30.
+          - Exact SF / BitChordIcons.MusicNote beamed eighth notes (15px).
+          - Bold white text: "Best Part" (W700, 13px).
+          - Sizing & padding: pl-3 pr-3.5 py-[7px] gap-[6px] h-[32px].
           - Centered below album artwork.
-          - Clicking forwards the song to Best Part, shows nothing, and disappears.
+          - Seamless seeking on click with 0 popups/toasts, disappearing once reached.
         */}
         <button
           type="button"
@@ -90,14 +113,14 @@ export function BestPartButton() {
             e.preventDefault();
             setAdminModalOpen(true);
           }}
-          className="flex h-8 items-center gap-1.5 rounded-full border border-white/40 bg-[#8b5cf6]/25 px-4 py-1.5 shadow-[0_2px_14px_rgba(139,92,246,0.28)] backdrop-blur-md transition-all duration-150 hover:border-white/60 hover:bg-[#8b5cf6]/35 active:scale-95 cursor-pointer"
+          className="flex h-[32px] items-center pl-3 pr-3.5 py-[7px] gap-[6px] rounded-full border border-white/30 bg-white/[0.18] shadow-[0_2px_8px_rgba(0,0,0,0.15)] backdrop-blur-xl transition-all duration-200 hover:border-white/45 hover:bg-white/[0.24] active:scale-95 cursor-pointer select-none"
           aria-label="Best Part"
         >
-          {/* White music note icon */}
-          <Music size={14} className="text-white fill-white/20 stroke-[2.4]" aria-hidden="true" />
+          {/* Beamed music note icon (15px) */}
+          <BestPartMusicIcon className="size-[15px] text-white flex-none" />
 
           {/* Bold white text: "Best Part" */}
-          <span className="text-[13px] font-bold tracking-wide text-white">
+          <span className="text-[13px] font-bold text-white tracking-normal leading-none select-none">
             Best Part
           </span>
         </button>
@@ -107,3 +130,4 @@ export function BestPartButton() {
     </>
   );
 }
+export { BestPartMusicIcon };
