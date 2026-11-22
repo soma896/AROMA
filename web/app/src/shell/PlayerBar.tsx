@@ -166,12 +166,21 @@ export function PlayerBar() {
           {isBestPartVisible && (
             <button
               type="button"
-              className="flex h-7 items-center gap-1.5 rounded-full border border-white/30 bg-white/[0.18] px-2.5 text-[11px] font-bold text-white shadow-sm backdrop-blur-xl hover:bg-white/[0.24] active:scale-95 transition-all select-none"
+              className="flex h-7 items-center pl-2.5 pr-3 gap-1.5 rounded-full shadow-sm transition-all hover:brightness-110 active:scale-95 select-none"
+              style={{
+                background:
+                  'linear-gradient(rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.17)) padding-box, linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.20) 100%) border-box',
+                border: '1px solid transparent',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+              }}
               onClick={() => void jumpToBestPart()}
               aria-label="Best Part"
             >
-              <BestPartMusicIcon className="size-3 text-white" />
-              Best Part
+              <BestPartMusicIcon className="w-3.5 h-3 text-white flex-none" />
+              <span className="text-[11px] font-semibold text-white leading-none select-none">
+                Best Part
+              </span>
             </button>
           )}
           <button

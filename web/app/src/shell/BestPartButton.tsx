@@ -5,23 +5,33 @@ import { getAudio, usePlayer } from '@/state/player';
 import { BestPartAdminModal } from './BestPartAdminModal';
 
 /**
- * Exact BitChord / Aroma beamed musical note vector icon.
- * Matches BitChordIcons.MusicNote (SF Music Note) from the reference image.
+ * Exact beamed pair of musical notes (♫).
+ * Reconstructed 1:1 from the user's reference screenshot pixel grid.
  */
-function BestPartMusicIcon({ className = 'size-4' }: { className?: string }) {
+function BestPartMusicIcon({ className = 'w-[15px] h-[13.5px]' }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-      {/* Note heads */}
-      <ellipse cx="7.1" cy="17.7" rx="2.9" ry="2.5" />
-      <ellipse cx="17.1" cy="15.9" rx="2.9" ry="2.5" />
-      {/* Stems and top beam */}
+    <svg
+      viewBox="0 0 20 18"
+      className={className}
+      fill="currentColor"
+      aria-hidden="true"
+    >
+      {/* Tilted oval note heads */}
+      <ellipse cx="4.8" cy="13.6" rx="3.2" ry="2.4" transform="rotate(-15 4.8 13.6)" />
+      <ellipse cx="14.4" cy="11.8" rx="3.2" ry="2.4" transform="rotate(-15 14.4 11.8)" />
+      {/* Stems & connecting beam */}
       <path
-        d="M10 17.7V6.7L20 4.9v11"
+        d="M7.4 13.6V3.8L17.2 2.1V11.8"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.2"
+        strokeWidth="2.1"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+      {/* Solid filled beam bar */}
+      <path
+        d="M6.8 4.6L17.6 2.8V1.0L6.8 2.8Z"
+        fill="currentColor"
       />
     </svg>
   );
@@ -91,18 +101,18 @@ export function BestPartButton() {
       <div
         className={`flex justify-center transition-all duration-300 ease-out ${
           isVisible
-            ? 'opacity-100 scale-100 pointer-events-auto h-8 my-3'
+            ? 'opacity-100 scale-100 pointer-events-auto h-[34px] my-2.5'
             : 'opacity-0 scale-90 pointer-events-none h-0 my-0 overflow-hidden'
         }`}
       >
         {/*
-          EXACT BUTTON DESIGN AS PROVIDED IN USER'S CLOSE-UP IMAGE:
-          - Rounded pill-shaped button.
-          - Translucent frosted glass background: bg-white/[0.18] (subtly transparent).
-          - Hairline translucent white rim: border border-white/30.
-          - Exact SF / BitChordIcons.MusicNote beamed eighth notes (15px).
-          - Bold white text: "Best Part" (W700, 13px).
-          - Sizing & padding: pl-3 pr-3.5 py-[7px] gap-[6px] h-[32px].
+          EXACT BUTTON SHAPE AND STYLE AS PROVIDED IN USER'S REFERENCE IMAGE:
+          - Rounded pill / stadium capsule shape (border-radius: 9999px).
+          - Translucent frosted glass background: rgba(255, 255, 255, 0.17) with backdrop-filter: blur(16px).
+          - Hairline specular rim: linear-gradient(180deg, rgba(255,255,255,0.52), rgba(255,255,255,0.20)).
+          - Beamed pair of eighth notes icon (15px x 13.5px) in crisp solid white.
+          - "Best Part" label in crisp white, semi-bold (font-semibold, 13px, leading-none).
+          - Proportions & padding: h-[34px], pl-3, pr-3.5, gap-[7px].
           - Centered below album artwork.
           - Seamless seeking on click with 0 popups/toasts, disappearing once reached.
         */}
@@ -113,14 +123,21 @@ export function BestPartButton() {
             e.preventDefault();
             setAdminModalOpen(true);
           }}
-          className="flex h-[32px] items-center pl-3 pr-3.5 py-[7px] gap-[6px] rounded-full border border-white/30 bg-white/[0.18] shadow-[0_2px_8px_rgba(0,0,0,0.15)] backdrop-blur-xl transition-all duration-200 hover:border-white/45 hover:bg-white/[0.24] active:scale-95 cursor-pointer select-none"
+          className="inline-flex h-[34px] items-center pl-3 pr-3.5 gap-[7px] rounded-full shadow-[0_2px_10px_rgba(0,0,0,0.18)] transition-all duration-200 hover:brightness-110 active:scale-95 cursor-pointer select-none"
+          style={{
+            background:
+              'linear-gradient(rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.17)) padding-box, linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.20) 100%) border-box',
+            border: '1px solid transparent',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+          }}
           aria-label="Best Part"
         >
-          {/* Beamed music note icon (15px) */}
-          <BestPartMusicIcon className="size-[15px] text-white flex-none" />
+          {/* Beamed music note icon */}
+          <BestPartMusicIcon className="w-[15px] h-[13.5px] text-white flex-none" />
 
-          {/* Bold white text: "Best Part" */}
-          <span className="text-[13px] font-bold text-white tracking-normal leading-none select-none">
+          {/* Clean white text: "Best Part" */}
+          <span className="text-[13px] font-semibold tracking-normal text-white leading-none select-none">
             Best Part
           </span>
         </button>
