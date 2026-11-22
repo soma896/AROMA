@@ -11,28 +11,20 @@ import { BestPartAdminModal } from './BestPartAdminModal';
 function BestPartMusicIcon({ className = 'w-[15px] h-[13.5px]' }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 20 18"
+      viewBox="0 0 24 24"
       className={className}
       fill="currentColor"
       aria-hidden="true"
     >
-      {/* Tilted oval note heads */}
-      <ellipse cx="4.8" cy="13.6" rx="3.2" ry="2.4" transform="rotate(-15 4.8 13.6)" />
-      <ellipse cx="14.4" cy="11.8" rx="3.2" ry="2.4" transform="rotate(-15 14.4 11.8)" />
-      {/* Stems & connecting beam */}
-      <path
-        d="M7.4 13.6V3.8L17.2 2.1V11.8"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {/* Solid filled beam bar */}
-      <path
-        d="M6.8 4.6L17.6 2.8V1.0L6.8 2.8Z"
-        fill="currentColor"
-      />
+      {/* Tilted note heads */}
+      <ellipse cx="8.2" cy="17.2" rx="3.8" ry="2.7" transform="rotate(-18 8.2 17.2)" />
+      <ellipse cx="16.8" cy="15.2" rx="3.8" ry="2.7" transform="rotate(-18 16.8 15.2)" />
+      {/* Left stem */}
+      <rect x="10.4" y="5.0" width="2.4" height="12.0" rx="1.0" />
+      {/* Right stem */}
+      <rect x="19.0" y="2.6" width="2.4" height="12.0" rx="1.0" />
+      {/* Solid connecting beam */}
+      <polygon points="10.4,7.4 21.4,4.9 21.4,2.2 10.4,4.7" />
     </svg>
   );
 }

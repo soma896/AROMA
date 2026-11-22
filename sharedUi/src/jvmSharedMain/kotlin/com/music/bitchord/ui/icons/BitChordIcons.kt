@@ -383,6 +383,57 @@ object BitChordIcons {
     }
 
     /**
+     * Exact Best Part beamed musical note (♫), with solid tilted heads and bold beam.
+     * Matches the reference screenshot 1:1.
+     */
+    val BestPartNote: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "bc_best_part_note",
+            defaultWidth = 24.dp, defaultHeight = 24.dp,
+            viewportWidth = 24f, viewportHeight = 24f,
+        ).apply {
+            path(fill = stroke) {
+                // Left note head (tilted ellipse)
+                moveTo(4.5f, 16.5f)
+                cubicTo(4.2f, 14.8f, 6.2f, 13.5f, 8.8f, 13.7f)
+                cubicTo(11.4f, 13.9f, 13.2f, 15.5f, 12.8f, 17.2f)
+                cubicTo(12.4f, 18.9f, 10.4f, 20.2f, 7.8f, 20.0f)
+                cubicTo(5.2f, 19.8f, 4.8f, 18.2f, 4.5f, 16.5f)
+                close()
+
+                // Right note head (tilted ellipse, higher up)
+                moveTo(13.0f, 14.5f)
+                cubicTo(12.7f, 12.8f, 14.7f, 11.5f, 17.3f, 11.7f)
+                cubicTo(19.9f, 11.9f, 21.7f, 13.5f, 21.3f, 15.2f)
+                cubicTo(20.9f, 16.9f, 18.9f, 18.2f, 16.3f, 18.0f)
+                cubicTo(13.7f, 17.8f, 13.3f, 16.2f, 13.0f, 14.5f)
+                close()
+
+                // Left stem
+                moveTo(10.5f, 16.5f)
+                lineTo(12.8f, 16.5f)
+                lineTo(12.8f, 5.0f)
+                lineTo(10.5f, 5.0f)
+                close()
+
+                // Right stem
+                moveTo(19.0f, 14.5f)
+                lineTo(21.3f, 14.5f)
+                lineTo(21.3f, 2.6f)
+                lineTo(19.0f, 2.6f)
+                close()
+
+                // Solid upward-slanted connecting beam
+                moveTo(10.5f, 7.5f)
+                lineTo(21.3f, 5.0f)
+                lineTo(21.3f, 2.2f)
+                lineTo(10.5f, 4.7f)
+                close()
+            }
+        }.build()
+    }
+
+    /**
      * Two beamed notes, filled, sitting level — what the lyrics show through an
      * instrumental section. Apart from [MusicNote], which stays the artwork
      * placeholder elsewhere.

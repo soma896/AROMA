@@ -561,7 +561,7 @@ internal fun BestPartPill(
             shrinkVertically(tween(BEST_PART_FADE_MS, delayMillis = BEST_PART_FADE_MS / 2)),
         modifier = modifier,
     ) {
-        val shape = CircleShape
+        val shape = RoundedCornerShape(999.dp)
         val label = stringResource(Res.string.best_part)
         val description = stringResource(Res.string.best_part_description)
         val chrome = LocalPlayerChrome.current
@@ -592,7 +592,7 @@ internal fun BestPartPill(
                 modifier = Modifier.padding(start = 12.dp, end = 15.dp, top = 7.dp, bottom = 7.dp),
             ) {
                 Icon(
-                    imageVector = BitChordIcons.MusicNote,
+                    imageVector = BitChordIcons.BestPartNote,
                     contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(15.dp),
