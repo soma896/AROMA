@@ -19,8 +19,6 @@ services:
   - type: web
     name: aroma-web-player
     runtime: static
-    plan: free
-    region: oregon
     rootDir: web
     buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @aroma/app build
     staticPublishPath: ./app/dist
