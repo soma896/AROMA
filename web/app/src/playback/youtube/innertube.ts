@@ -158,14 +158,18 @@ async function simpleRequestFetch(input: RequestInfo | URL, init?: RequestInit):
     }
   }
 
-  return fetch(targetUrl, {
+  const fetchInit: RequestInit = {
     method,
     headers,
-    body: body ?? null,
     signal: init?.signal ?? request?.signal ?? null,
     // Anonymous: the user's YouTube cookies never ride along on page requests.
     credentials: 'omit',
-  });
+  };
+  if (method !== 'GET' && method !== 'HEAD' && body != null) {
+    fetchInit.body = body;
+  }
+
+  return fetch(targetUrl, fetchInit);
 }
 
 function isInnertubeCall(url: URL): boolean {
