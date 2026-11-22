@@ -1,4 +1,5 @@
 import type { Innertube, Types } from 'youtubei.js/web';
+import { config } from '@/config';
 import { getBridge } from '@/extension/bridge';
 import { ensureYtAuth, identityOf, noteMusicIdentity } from '@/extension/useYtAuth';
 import { trackLog } from '../trackLog';
@@ -124,10 +125,11 @@ async function simpleRequestFetch(input: RequestInfo | URL, init?: RequestInit):
   const bridge = getBridge();
   let targetUrl: string | URL = url;
   if (!bridge) {
+    const proxyBase = config.partyServerUrl ? config.partyServerUrl.replace(/\/$/, '') : '';
     if (url.hostname === 'music.youtube.com') {
-      targetUrl = `/__yt_music__${url.pathname}${url.search}`;
+      targetUrl = `${proxyBase}/__yt_music__${url.pathname}${url.search}`;
     } else if (url.hostname === 'www.youtube.com' || url.hostname === 'youtube.com') {
-      targetUrl = `/__yt_www__${url.pathname}${url.search}`;
+      targetUrl = `${proxyBase}/__yt_www__${url.pathname}${url.search}`;
     }
   }
 

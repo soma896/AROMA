@@ -1,4 +1,5 @@
 import shaka from 'shaka-player/dist/shaka-player.compiled';
+import { config } from '@/config';
 import { getBridge } from '@/extension/bridge';
 import { getVideoElement, qualityLabel, setVideoQuality, useVideo, type VideoQuality } from '@/state/video';
 import { trackLog } from '../trackLog';
@@ -47,9 +48,10 @@ async function ensurePlayer(): Promise<shaka.Player> {
   const created = new shaka.Player();
   created.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
     if (!getBridge()) {
+      const proxyBase = config.partyServerUrl ? config.partyServerUrl.replace(/\/$/, '') : '';
       request.uris = request.uris.map((uri) => {
         if (uri.includes('googlevideo.com')) {
-          return `/__googlevideo__?url=${encodeURIComponent(uri)}`;
+          return `${proxyBase}/__googlevideo__?url=${encodeURIComponent(uri)}`;
         }
         return uri;
       });

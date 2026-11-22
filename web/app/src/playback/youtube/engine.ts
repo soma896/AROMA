@@ -2,6 +2,7 @@ import { SabrStreamingAdapter } from 'googlevideo/sabr-streaming-adapter';
 import { buildSabrFormat } from 'googlevideo/utils';
 import shaka from 'shaka-player/dist/shaka-player.compiled';
 import { Constants, Utils, YT, type Innertube } from 'youtubei.js/web';
+import { config } from '@/config';
 import { timed, trackLog } from '../trackLog';
 import { botguard } from './botguard';
 import { ytAuthSnapshot } from '@/extension/useYtAuth';
@@ -115,9 +116,10 @@ export class YouTubeEngine {
     const player = new shaka.Player();
     player.getNetworkingEngine()?.registerRequestFilter((_type, request) => {
       if (!getBridge()) {
+        const proxyBase = config.partyServerUrl ? config.partyServerUrl.replace(/\/$/, '') : '';
         request.uris = request.uris.map((uri) => {
           if (uri.includes('googlevideo.com')) {
-            return `/__googlevideo__?url=${encodeURIComponent(uri)}`;
+            return `${proxyBase}/__googlevideo__?url=${encodeURIComponent(uri)}`;
           }
           return uri;
         });

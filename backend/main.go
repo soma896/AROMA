@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"sort"
 	"strings"
@@ -81,6 +82,11 @@ func main() {
 	// WebSocket endpoint
 	mux.HandleFunc("GET /ws/parties/{code}", handleWebSocket)
 
+	// Web YouTube & audio streaming proxy
+	mux.HandleFunc("/__yt_music__/", createYTProxy("https://music.youtube.com", "/__yt_music__"))
+	mux.HandleFunc("/__yt_www__/", createYTProxy("https://www.youtube.com", "/__yt_www__"))
+	mux.HandleFunc("/__googlevideo__", handleGoogleVideoProxy)
+
 	handler := corsMiddleware(mux)
 
 	addr := fmt.Sprintf("0.0.0.0:%d", config.Port)
@@ -100,6 +106,17 @@ func main() {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/__yt_") || strings.HasPrefix(r.URL.Path, "/__googlevideo__") {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 		origin := r.Header.Get("Origin")
 		if origin != "" && config.IsAllowedOrigin(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -275,6 +292,78 @@ func handleTime(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"serverMs": clock.NowMs(),
 	})
+}
+
+func createYTProxy(originHost, prefix string) http.HandlerFunc {
+	target, _ := url.Parse(originHost)
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL.Scheme = target.Scheme
+			req.URL.Host = target.Host
+			req.Host = target.Host
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, prefix)
+			if !strings.HasPrefix(req.URL.Path, "/") {
+				req.URL.Path = "/" + req.URL.Path
+			}
+			req.Header.Set("Origin", originHost)
+			req.Header.Set("Referer", originHost+"/")
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+			req.Header.Del("Cookie")
+		},
+		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Set("Access-Control-Allow-Origin", "*")
+			resp.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
+			resp.Header.Set("Access-Control-Allow-Headers", "*")
+			return nil
+		},
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE, HEAD")
+			w.Header().Set("Access-Control-Allow-Headers", "*")
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	}
+}
+
+func handleGoogleVideoProxy(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	targetParam := r.URL.Query().Get("url")
+	if targetParam == "" {
+		http.Error(w, "missing url", http.StatusBadRequest)
+		return
+	}
+	targetURL, err := url.Parse(targetParam)
+	if err != nil || (!strings.HasSuffix(targetURL.Hostname(), ".googlevideo.com") && targetURL.Hostname() != "googlevideo.com") {
+		http.Error(w, "invalid target", http.StatusBadRequest)
+		return
+	}
+	proxy := &httputil.ReverseProxy{
+		Director: func(req *http.Request) {
+			req.URL = targetURL
+			req.Host = targetURL.Host
+			req.Header.Del("Origin")
+			req.Header.Del("Referer")
+			req.Header.Del("Cookie")
+			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+		},
+		ModifyResponse: func(resp *http.Response) error {
+			resp.Header.Set("Access-Control-Allow-Origin", "*")
+			resp.Header.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, HEAD")
+			resp.Header.Set("Access-Control-Allow-Headers", "*")
+			return nil
+		},
+	}
+	proxy.ServeHTTP(w, r)
 }
 
 // handlePresence takes the open apps' heartbeat:
