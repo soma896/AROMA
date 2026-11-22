@@ -24,7 +24,8 @@ class JamInviteTest {
     fun `the scheme and host may be in any case`() {
         // QR codes often carry URLs upper-cased; this used to fall through and
         // the desktop field kept the first six letters, "HTTPSB".
-        assertEquals("ABC123", JamInvite.parse("HTTPS://BITCHORD.KUSHAGRASINGH.IN/INVITE/ABC123"))
+        assertEquals("ABC123", JamInvite.parse("HTTPS://AROMA.APP/INVITE/ABC123"))
+        assertEquals("ABC123", JamInvite.parse("Https://Aroma.app/invite/abc123"))
         assertEquals("ABC123", JamInvite.parse("Https://BitChord.kushagrasingh.in/invite/abc123"))
     }
 
@@ -41,6 +42,7 @@ class JamInviteTest {
 
     @Test
     fun `plain http is refused`() {
+        assertNull(JamInvite.parse("http://aroma.app/invite/ABC123"))
         assertNull(JamInvite.parse("http://bitchord.kushagrasingh.in/invite/ABC123"))
     }
 

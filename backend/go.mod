@@ -1,4 +1,4 @@
-module github.com/KabirSinghBhatia/BitChord/backend
+module github.com/soma896/AROMA/backend
 
 go 1.27.0
 

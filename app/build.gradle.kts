@@ -50,7 +50,7 @@ val lastfmSecret: String = (
 val listenTogetherServer: String = (
     localProps.getProperty("LISTEN_TOGETHER_SERVER")
         ?: System.getenv("LISTEN_TOGETHER_SERVER")
-        ?: "https://bitchord-listen-together.onrender.com"
+        ?: "http://10.0.2.2:8000"
     ).trim().trimEnd('/')
 
 /*
@@ -62,7 +62,7 @@ val listenTogetherServer: String = (
 val addonAuthServer: String = (
     localProps.getProperty("ADDON_AUTH_SERVER")
         ?: System.getenv("ADDON_AUTH_SERVER")
-        ?: "https://bitchord-auth.kushagrasingh.in"
+        ?: ""
     ).trim().trimEnd('/')
 
 // See the root build.gradle.kts: one version for the phone and its watch app.

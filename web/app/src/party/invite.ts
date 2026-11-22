@@ -1,10 +1,13 @@
 /**
- * Party invites (JamInviteLink.kt): `https://bitchord.kushagrasingh.in/invite/<CODE>`,
- * optionally `?server=<custom server>`, and `bitchord://party/<CODE>`. On the
+ * Party invites: `/invite/<CODE>`, optionally `?server=<custom server>`,
+ * and `aroma://party/<CODE>` (or legacy `bitchord://party/<CODE>`). On the
  * web the first is a route of this app (`/invite/:code`).
  */
 
-export const INVITE_ORIGIN = 'https://bitchord.kushagrasingh.in';
+export const INVITE_ORIGIN =
+  typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : 'https://aroma.app';
 export const CODE_LENGTH = 6;
 
 /** Letters and digits only, upper case; null unless it's six of them. */
@@ -32,7 +35,7 @@ export function parseInvite(value: string): { code: string; serverUrl: string | 
     return null;
   }
   const server = sanitizeServerUrl(url.searchParams.get('server'));
-  if (url.protocol === 'bitchord:' && url.host.toLowerCase() === 'party') {
+  if ((url.protocol === 'aroma:' || url.protocol === 'bitchord:') && url.host.toLowerCase() === 'party') {
     const code = cleanCode(url.pathname.replace(/^\/+|\/+$/g, '') || url.searchParams.get('code') || '');
     return code ? { code, serverUrl: server } : null;
   }
@@ -41,9 +44,9 @@ export function parseInvite(value: string): { code: string; serverUrl: string | 
   return null;
 }
 
-/** The link to share (JamInviteLink.url): a custom server's own invite page, else the public site's. */
+/** The link to share: a custom server's own invite page, else the public site's. */
 export function inviteUrl(code: string, customServer: string | null): string {
   const base = customServer?.trim().replace(/\/+$/, '');
-  const origin = base && base.toLowerCase() !== INVITE_ORIGIN ? base : INVITE_ORIGIN;
+  const origin = base && base.toLowerCase() !== INVITE_ORIGIN.toLowerCase() ? base : INVITE_ORIGIN;
   return `${origin}/invite/${code.toUpperCase()}`;
 }

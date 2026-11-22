@@ -413,7 +413,12 @@ function connect(): void {
     const { code } = useParty.getState();
     if (id !== loopId || !code || !token || !server) return;
     useParty.setState({ connection: 'connecting' });
-    const ws = new WebSocket(`${server.replace(/^http/, 'ws')}/ws/parties/${code}`, ['bitchord.v1', `bitchord.token.${token}`]);
+    const ws = new WebSocket(`${server.replace(/^http/, 'ws')}/ws/parties/${code}`, [
+      'aroma.v1',
+      `aroma.token.${token}`,
+      'bitchord.v1',
+      `bitchord.token.${token}`,
+    ]);
     socket = ws;
     let opened = false;
     ws.onopen = () => {

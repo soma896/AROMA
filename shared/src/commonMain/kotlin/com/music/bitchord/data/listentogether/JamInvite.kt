@@ -9,7 +9,8 @@ package com.music.bitchord.data.listentogether
  */
 object JamInvite {
 
-    const val ORIGIN = "https://bitchord.kushagrasingh.in"
+    const val ORIGIN = "https://aroma.app"
+    const val LEGACY_ORIGIN = "https://bitchord.kushagrasingh.in"
 
     /** How many characters a party code carries. */
     const val CODE_LENGTH = 6
@@ -17,9 +18,13 @@ object JamInvite {
     /** The normalized party code, for the public invite URL shape only. */
     fun parse(value: String?): String? {
         val text = value?.trim() ?: return null
-        val prefix = "$ORIGIN/invite/"
-        if (!text.startsWith(prefix, ignoreCase = true)) return null
-        // Not removePrefix: it is case-sensitive, and the check above is not.
+        val prefix = if (text.startsWith("$ORIGIN/invite/", ignoreCase = true)) {
+            "$ORIGIN/invite/"
+        } else if (text.startsWith("$LEGACY_ORIGIN/invite/", ignoreCase = true)) {
+            "$LEGACY_ORIGIN/invite/"
+        } else {
+            return null
+        }
         val code = text.substring(prefix.length).substringBefore('?').substringBefore('#')
         if (code.length != CODE_LENGTH || !code.all(Char::isLetterOrDigit)) return null
         return code.uppercase()

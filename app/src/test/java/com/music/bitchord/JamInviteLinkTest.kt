@@ -23,6 +23,10 @@ class JamInviteLinkTest {
     fun `parses and normalizes a public invite`() {
         assertEquals(
             "A1B2C3",
+            JamInviteLink.parse("https://aroma.app/invite/a1b2c3"),
+        )
+        assertEquals(
+            "A1B2C3",
             JamInviteLink.parse("https://bitchord.kushagrasingh.in/invite/a1b2c3"),
         )
     }
@@ -31,25 +35,25 @@ class JamInviteLinkTest {
     fun `accepts query parameters without making them part of the code`() {
         assertEquals(
             "ABC123",
-            JamInviteLink.parse("https://bitchord.kushagrasingh.in/invite/ABC123?from=share"),
+            JamInviteLink.parse("https://aroma.app/invite/ABC123?from=share"),
         )
     }
 
     @Test
     fun `rejects other hosts schemes paths and malformed codes`() {
-        assertNull(JamInviteLink.parse("http://bitchord.kushagrasingh.in/invite/ABC123"))
+        assertNull(JamInviteLink.parse("http://aroma.app/invite/ABC123"))
         assertNull(JamInviteLink.parse("https://example.com/invite/ABC123"))
-        assertNull(JamInviteLink.parse("https://bitchord.kushagrasingh.in/"))
-        assertNull(JamInviteLink.parse("https://bitchord.kushagrasingh.in/download"))
-        assertNull(JamInviteLink.parse("https://bitchord.kushagrasingh.in/invite/ABC123/"))
-        assertNull(JamInviteLink.parse("https://bitchord.kushagrasingh.in/invite/ABC123/extra"))
-        assertNull(JamInviteLink.parse("https://bitchord.kushagrasingh.in/invite/TOO-LONG"))
+        assertNull(JamInviteLink.parse("https://aroma.app/"))
+        assertNull(JamInviteLink.parse("https://aroma.app/download"))
+        assertNull(JamInviteLink.parse("https://aroma.app/invite/ABC123/"))
+        assertNull(JamInviteLink.parse("https://aroma.app/invite/ABC123/extra"))
+        assertNull(JamInviteLink.parse("https://aroma.app/invite/TOO-LONG"))
     }
 
     @Test
     fun `builds the canonical share URL`() {
         assertEquals(
-            "https://bitchord.kushagrasingh.in/invite/ABC123",
+            "https://aroma.app/invite/ABC123",
             JamInviteLink.url("abc123"),
         )
     }
@@ -135,7 +139,7 @@ class JamInviteLinkTest {
         } else {
             JamInviteLink.url(code, activePartyHost)
         }
-        assertEquals("https://bitchord.kushagrasingh.in/invite/JAM001", link)
+        assertEquals("https://aroma.app/invite/JAM001", link)
     }
 
     @Test
@@ -148,7 +152,7 @@ class JamInviteLinkTest {
             JamInviteLink.url(code, customHost)
         }
         assertEquals("https://custom.jam.example.com/invite/JAM002", link)
-        assertNotEquals("https://bitchord.kushagrasingh.in/invite/JAM002", link)
+        assertNotEquals("https://aroma.app/invite/JAM002", link)
     }
 
     @Test
@@ -479,7 +483,7 @@ class JamInviteLinkTest {
         assertTrue(validatePayload(true, """{"ok":true,"serverMs":1789836652479}"""))
 
         // Catch-all root response (from invalid subpath like /1324/healthz)
-        assertFalse(validatePayload(true, """{"maxMembers":5,"parties":0,"serverMs":1789836644489,"service":"bitchord-listen-together"}"""))
+        assertFalse(validatePayload(true, """{"maxMembers":5,"parties":0,"serverMs":1789836644489,"service":"aroma-listen-together"}"""))
 
         // Captive portal / proxy HTML response
         assertFalse(validatePayload(true, "<!DOCTYPE html><html><body>Login Required</body></html>"))
