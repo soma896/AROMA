@@ -82,6 +82,8 @@ interface PlayerState extends Settings {
   playVideo: (videoId: string, hint?: Partial<Omit<NowPlaying, 'videoId'>>) => Promise<void>;
   playNext: (tracks: Track[], source?: QueueSource | null) => void;
   addToQueue: (tracks: Track[], source?: QueueSource | null) => void;
+  /** Moves an upcoming track directly to play next (immediately after currently playing). */
+  movePlayNext: (fromIndex: number) => void;
   /** Tapping a row in Up Next (QueueTimeline.computeJumpOrder). */
   jumpTo: (index: number) => void;
   removeAt: (index: number) => void;
@@ -469,8 +471,32 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
   },
 
   playNext(tracks, source = null) {
-    insertUser(tracks, source, true);
+    if (!tracks.length) return;
+    const { queue, index } = get();
+    if (index < 0) {
+      get().playTrack(tracks[0]!, source ?? { title: 'Queue', type: 'queue' });
+      if (tracks.length > 1) {
+        get().addToQueue(tracks.slice(1), source);
+      }
+      return;
+    }
+
+    // Filter out any upcoming instances of these tracks to prevent duplicate entries
+    // and effectively MOVE them immediately after the currently playing song (Requirements 2, 3, 8).
+    const trackVideoIds = new Set(tracks.map((t) => t.videoId));
+    const head = queue.slice(0, index + 1);
+    const upcomingWithoutMoved = queue.slice(index + 1).filter((e) => !trackVideoIds.has(e.track.videoId));
+    const newEntries = tracks.map((t) => asEntry(t, 'user', source));
+    const nextQueue = [...head, ...newEntries, ...upcomingWithoutMoved];
+
+    set({ queue: nextQueue });
     intent();
+  },
+
+  movePlayNext(fromIndex) {
+    const { queue, index } = get();
+    if (fromIndex <= index || fromIndex >= queue.length || fromIndex === index + 1) return;
+    get().move(fromIndex, index + 1);
   },
 
   addToQueue(tracks, source = null) {
@@ -501,7 +527,11 @@ export const usePlayer = create<PlayerState>()((set, get) => ({
     if (from <= index || to <= index || from >= queue.length || to >= queue.length || from === to) return;
     const next = [...queue];
     const [entry] = next.splice(from, 1);
-    next.splice(to, 0, entry!);
+    if (!entry) return;
+    // When a user explicitly moves a track, promote it to 'user' tier so it won't be
+    // reshuffled by shuffle mode or misclassified by autoplay sectioning.
+    const movedEntry: QueueEntry = { ...entry, tier: 'user' };
+    next.splice(to, 0, movedEntry);
     set({ queue: next });
     intent();
   },
