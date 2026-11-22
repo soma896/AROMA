@@ -181,10 +181,14 @@ export async function playerRequest(
 }
 
 /** Why a playability status is a verdict on the track rather than on the client, or null if it isn't. */
-const AGE_GATE = /confirm your age|age-restricted|inappropriate for some users|sign in to confirm/;
+const AGE_GATE = /confirm your age|age-restricted|inappropriate for some users/;
+const BOT_CHALLENGE = /not a bot|confirm you.re not a bot|bot detection/;
 
 function permanentReason(status: string | undefined, reason: string | undefined, signedIn: boolean): string | null {
   const text = (reason ?? '').toLowerCase();
+  if (BOT_CHALLENGE.test(text)) {
+    return 'YouTube anti-bot verification required. Install the AROMA Extension (bottom-left) to play songs in the browser.';
+  }
   if (AGE_GATE.test(text)) {
     return signedIn
       ? 'YouTube won’t serve this age-restricted track to this account. Check the account’s age is verified on YouTube.'
