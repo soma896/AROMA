@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +18,7 @@ import (
 	"github.com/soma896/AROMA/backend/config"
 	"github.com/soma896/AROMA/backend/presence"
 	"github.com/soma896/AROMA/backend/protocol"
+	"github.com/soma896/AROMA/backend/user"
 )
 
 func setupTestServer() *httptest.Server {
@@ -33,8 +35,11 @@ func TestRESTEndpoints(t *testing.T) {
 
 	// 1. Health check
 	res, err := http.Get(ts.URL + "/healthz")
-	if err != nil || res.StatusCode != http.StatusOK {
-		t.Fatalf("GET /healthz failed: status %v, err %v", res.StatusCode, err)
+	if err != nil {
+		t.Fatalf("GET /healthz failed with err: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("GET /healthz failed: status %v", res.StatusCode)
 	}
 	var health map[string]interface{}
 	_ = json.NewDecoder(res.Body).Decode(&health)
@@ -616,11 +621,40 @@ func TestBestPartEndpoints(t *testing.T) {
 	}
 }
 
+type mockTokenVerifier struct{}
+
+func (m *mockTokenVerifier) VerifyToken(idToken string, expectedAudience string) (*user.GoogleTokenInfo, error) {
+	if idToken == "bad_token" {
+		return nil, errors.New("invalid google token: signature check failed")
+	}
+	if idToken == "unverified_email_token" {
+		return nil, errors.New("email is not verified")
+	}
+	if idToken == "expired_token" {
+		return nil, errors.New("token has expired")
+	}
+	if strings.HasPrefix(idToken, "valid_token_") {
+		sub := strings.TrimPrefix(idToken, "valid_token_")
+		return &user.GoogleTokenInfo{
+			Sub:           "google_" + sub,
+			Email:         sub + "@gmail.com",
+			EmailVerified: "true",
+			Name:          "User " + sub,
+			Picture:       "https://lh3.googleusercontent.com/avatar",
+			Aud:           expectedAudience,
+			Iss:           "https://accounts.google.com",
+		}, nil
+	}
+	return nil, errors.New("invalid token: unrecognized test token")
+}
+
 func TestUserAuthAndDataEndpoints(t *testing.T) {
 	ts := setupTestServer()
 	defer ts.Close()
 
-	// 1. Invalid Google Login
+	userStore.SetTokenVerifier(&mockTokenVerifier{})
+
+	// 1. Invalid Google Login (empty body)
 	badRes, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(`{}`))
 	if err != nil {
 		t.Fatalf("POST /api/auth/google error: %v", err)
@@ -629,8 +663,31 @@ func TestUserAuthAndDataEndpoints(t *testing.T) {
 		t.Fatalf("expected 400 for empty idToken, got %v", badRes.StatusCode)
 	}
 
-	// 2. Successful Google Login (User 1)
-	loginBody := `{"idToken": "mock-user:g_sub_alice:Alice:alice@example.com"}`
+	// 1b. Reject invalid token
+	invalidRes, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(`{"idToken": "bad_token"}`))
+	if err != nil || invalidRes.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for invalid token, got %v", invalidRes.StatusCode)
+	}
+
+	// 1c. Reject unverified email
+	unverifiedRes, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(`{"idToken": "unverified_email_token"}`))
+	if err != nil || unverifiedRes.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for unverified email, got %v", unverifiedRes.StatusCode)
+	}
+	var unvBody map[string]interface{}
+	_ = json.NewDecoder(unverifiedRes.Body).Decode(&unvBody)
+	if unvBody["error"] != "email_not_verified" {
+		t.Fatalf("expected error email_not_verified, got %+v", unvBody)
+	}
+
+	// 1d. Reject expired token
+	expiredRes, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(`{"idToken": "expired_token"}`))
+	if err != nil || expiredRes.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for expired token, got %v", expiredRes.StatusCode)
+	}
+
+	// 2. Successful Google Login (User 1 - Alice)
+	loginBody := `{"idToken": "valid_token_alice"}`
 	res1, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(loginBody))
 	if err != nil || res1.StatusCode != http.StatusOK {
 		t.Fatalf("POST /api/auth/google failed: status %v, err %v", res1.StatusCode, err)
@@ -691,7 +748,7 @@ func TestUserAuthAndDataEndpoints(t *testing.T) {
 	}
 
 	// 8. User 2 (Bob) Logs in - Data Isolation Check
-	loginBody2 := `{"idToken": "mock-user:g_sub_bob:Bob:bob@example.com"}`
+	loginBody2 := `{"idToken": "valid_token_bob"}`
 	res2, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(loginBody2))
 	if err != nil || res2.StatusCode != http.StatusOK {
 		t.Fatalf("Bob login failed: status %v", res2.StatusCode)

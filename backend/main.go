@@ -46,6 +46,7 @@ var (
 	userStore = user.NewStore(getUserStorePath())
 	streamResolver = stream.NewResolver()
 	createLimiter = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
+	authLimiter   = newIPRateLimiter(time.Minute, 15, 5000)
 	presenceTracker = presence.NewTracker(
 		time.Duration(config.PresenceIntervalSec+config.PresenceGraceSec)*time.Second,
 		config.PresenceMaxEntries,
@@ -791,6 +792,12 @@ func registerRoutes(mux *http.ServeMux) {
 // User Authentication and Data Handlers
 
 func handleAuthGoogle(w http.ResponseWriter, r *http.Request) {
+	ip := clientIP(r)
+	if !authLimiter.Allow(ip) {
+		jsonError(w, http.StatusTooManyRequests, "rate_limited", "Too many authentication attempts. Please try again later.")
+		return
+	}
+
 	var body struct {
 		IDToken    string `json:"idToken"`
 		Credential string `json:"credential"`
@@ -808,45 +815,28 @@ func handleAuthGoogle(w http.ResponseWriter, r *http.Request) {
 	}
 	idToken = strings.TrimSpace(idToken)
 	if idToken == "" {
-		jsonError(w, http.StatusBadRequest, "missing_token", "idToken or credential is required")
+		jsonError(w, http.StatusBadRequest, "missing_token", "Authentication token is required.")
 		return
 	}
 
-	var info *user.GoogleTokenInfo
-	// Allow mock/testing tokens in test and dev mode: mock-user:sub:name:email
-	if strings.HasPrefix(idToken, "mock-user:") {
-		parts := strings.Split(idToken, ":")
-		sub := "mock_sub_default"
-		name := "Test User"
-		email := "test@example.com"
-		if len(parts) > 1 && parts[1] != "" {
-			sub = parts[1]
-		}
-		if len(parts) > 2 && parts[2] != "" {
-			name = parts[2]
-		}
-		if len(parts) > 3 && parts[3] != "" {
-			email = parts[3]
-		}
-		info = &user.GoogleTokenInfo{
-			Sub:           sub,
-			Email:         email,
-			EmailVerified: "true",
-			Name:          name,
-			Picture:       "https://lh3.googleusercontent.com/a/default-user",
-		}
-	} else {
-		var err error
-		info, err = userStore.VerifyGoogleToken(idToken)
-		if err != nil {
-			jsonError(w, http.StatusUnauthorized, "invalid_token", fmt.Sprintf("Failed to verify Google token: %v", err))
+	info, err := userStore.VerifyGoogleToken(idToken, config.GoogleClientID)
+	if err != nil {
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "email is not verified") {
+			jsonError(w, http.StatusUnauthorized, "email_not_verified", "Email is not verified. Please verify your Google email address.")
 			return
 		}
+		if strings.Contains(errMsg, "expired") || strings.Contains(errMsg, "invalid") || strings.Contains(errMsg, "issuer") || strings.Contains(errMsg, "audience") {
+			jsonError(w, http.StatusUnauthorized, "invalid_token", "Invalid authentication token. Please try again.")
+			return
+		}
+		jsonError(w, http.StatusUnauthorized, "auth_failed", "Google authentication failed. Please try again.")
+		return
 	}
 
 	u, sess, err := userStore.UpsertGoogleUser(info)
 	if err != nil {
-		jsonError(w, http.StatusInternalServerError, "server_error", "Failed to save user.")
+		jsonError(w, http.StatusInternalServerError, "server_error", "Account verification failed. Please try again.")
 		return
 	}
 

@@ -20,6 +20,14 @@ func getInt(key string, fallback int) int {
 	return parsed
 }
 
+func getString(key string, fallback string) string {
+	val := strings.TrimSpace(os.Getenv(key))
+	if val == "" {
+		return fallback
+	}
+	return val
+}
+
 func getCSV(key string, fallback string) []string {
 	val := os.Getenv(key)
 	if val == "" {
@@ -96,6 +104,7 @@ var (
 	TrustProxy           = getBool("JAM_TRUST_PROXY", false)
 	PublicOrigin         = getOrigin("JAM_PUBLIC_ORIGIN")
 	Port                 = getInt("PORT", 9000)
+	GoogleClientID       = getString("GOOGLE_CLIENT_ID", "1035659837584-aroma-music-player.apps.googleusercontent.com")
 )
 
 // Open-app heartbeats. The interval is handed back on every ping, so it can be

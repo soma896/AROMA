@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -63,13 +66,14 @@ type UserData struct {
 
 // Store manages users, sessions, and per-user personal data with persistence.
 type Store struct {
-	mu          sync.RWMutex
-	filePath    string
-	users       map[string]*User      // key: User.ID
-	byGoogleID  map[string]string     // key: GoogleID -> User.ID
-	sessions    map[string]*Session   // key: Session.Token
-	userData    map[string]*UserData  // key: User.ID
-	httpClient  *http.Client
+	mu         sync.RWMutex
+	filePath   string
+	users      map[string]*User     // key: User.ID
+	byGoogleID map[string]string    // key: GoogleID -> User.ID
+	sessions   map[string]*Session  // key: Session.Token
+	userData   map[string]*UserData // key: User.ID
+	httpClient *http.Client
+	verifier   TokenVerifier
 }
 
 type fileSnapshot struct {
@@ -162,20 +166,58 @@ func generateID(prefix string) string {
 type GoogleTokenInfo struct {
 	Sub           string `json:"sub"`
 	Email         string `json:"email"`
-	EmailVerified string `json:"email_verified"`
+	EmailVerified any    `json:"email_verified"`
 	Name          string `json:"name"`
 	Picture       string `json:"picture"`
 	Aud           string `json:"aud"`
+	Iss           string `json:"iss"`
+	Exp           any    `json:"exp"`
 }
 
-// VerifyGoogleToken validates an ID token against Google's OAuth2 tokeninfo endpoint.
-func (s *Store) VerifyGoogleToken(idToken string) (*GoogleTokenInfo, error) {
-	if idToken == "" {
+// TokenVerifier validates a Google ID token against cryptographic and issuer requirements.
+type TokenVerifier interface {
+	VerifyToken(idToken string, expectedAudience string) (*GoogleTokenInfo, error)
+}
+
+type defaultGoogleVerifier struct {
+	httpClient *http.Client
+}
+
+func isEmailVerified(val any) bool {
+	switch v := val.(type) {
+	case bool:
+		return v
+	case string:
+		return strings.EqualFold(strings.TrimSpace(v), "true")
+	default:
+		return false
+	}
+}
+
+func parseExp(val any) int64 {
+	switch v := val.(type) {
+	case float64:
+		return int64(v)
+	case int64:
+		return v
+	case json.Number:
+		n, _ := v.Int64()
+		return n
+	case string:
+		n, _ := strconv.ParseInt(strings.TrimSpace(v), 10, 64)
+		return n
+	default:
+		return 0
+	}
+}
+
+func (v *defaultGoogleVerifier) VerifyToken(idToken string, expectedAudience string) (*GoogleTokenInfo, error) {
+	if strings.TrimSpace(idToken) == "" {
 		return nil, errors.New("empty id token")
 	}
 
-	url := "https://oauth2.googleapis.com/tokeninfo?id_token=" + idToken
-	resp, err := s.httpClient.Get(url)
+	endpoint := "https://oauth2.googleapis.com/tokeninfo?id_token=" + url.QueryEscape(idToken)
+	resp, err := v.httpClient.Get(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to reach google tokeninfo: %w", err)
 	}
@@ -183,17 +225,62 @@ func (s *Store) VerifyGoogleToken(idToken string) (*GoogleTokenInfo, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("invalid google token (status %d): %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("invalid google token (status %d): %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	var info GoogleTokenInfo
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
 		return nil, fmt.Errorf("failed to decode google token response: %w", err)
 	}
-	if info.Sub == "" {
-		return nil, errors.New("missing subject in google token")
+
+	// 1. Verify issuer
+	if info.Iss != "accounts.google.com" && info.Iss != "https://accounts.google.com" {
+		return nil, fmt.Errorf("invalid token issuer: %s", info.Iss)
 	}
+
+	// 2. Verify sub (Google User ID)
+	if strings.TrimSpace(info.Sub) == "" {
+		return nil, errors.New("missing user identifier (sub) in google token")
+	}
+
+	// 3. Verify email_verified
+	if !isEmailVerified(info.EmailVerified) {
+		return nil, errors.New("email is not verified")
+	}
+
+	// 4. Verify expiration
+	expSec := parseExp(info.Exp)
+	if expSec > 0 && expSec < time.Now().Unix() {
+		return nil, errors.New("token has expired")
+	}
+
+	// 5. Verify audience (if expectedAudience configured and token has aud)
+	if expectedAudience != "" && info.Aud != "" && info.Aud != expectedAudience {
+		return nil, fmt.Errorf("token audience %q does not match %q", info.Aud, expectedAudience)
+	}
+
 	return &info, nil
+}
+
+// SetTokenVerifier configures a custom token verifier (useful for tests or mocking).
+func (s *Store) SetTokenVerifier(v TokenVerifier) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.verifier = v
+}
+
+// VerifyGoogleToken validates an ID token against Google's OAuth2 tokeninfo endpoint.
+func (s *Store) VerifyGoogleToken(idToken string, expectedAudience string) (*GoogleTokenInfo, error) {
+	s.mu.RLock()
+	v := s.verifier
+	client := s.httpClient
+	s.mu.RUnlock()
+
+	if v != nil {
+		return v.VerifyToken(idToken, expectedAudience)
+	}
+	def := &defaultGoogleVerifier{httpClient: client}
+	return def.VerifyToken(idToken, expectedAudience)
 }
 
 // UpsertGoogleUser creates or updates a user from verified Google token info.

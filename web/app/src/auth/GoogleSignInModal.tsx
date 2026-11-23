@@ -1,6 +1,7 @@
-import { Loader2, Music, UserCheck, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Loader2, ShieldCheck, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { AromaLogo } from '@/components/icons/AromaLogo';
+import { config } from '@/config';
 import { useAuth } from './useAuth';
 
 export function GoogleLogo({ size = 18 }: { size?: number }) {
@@ -32,42 +33,103 @@ export function GoogleSignInModal() {
   const loginWithGoogleToken = useAuth((s) => s.loginWithGoogleToken);
   const isLoading = useAuth((s) => s.isLoading);
 
-  const [customName, setCustomName] = useState('');
-  const [customEmail, setCustomEmail] = useState('');
-  const [showManual, setShowManual] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gisLoaded, setGisLoaded] = useState(false);
+  const buttonContainerRef = useRef<HTMLDivElement>(null);
 
+  // Initialize Official Google Identity Services SDK
   useEffect(() => {
     if (!isOpen) {
       setError(null);
-      setShowManual(false);
+      return;
     }
-  }, [isOpen]);
+
+    let isMounted = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const setupGoogleIdentity = () => {
+      if (!window.google?.accounts?.id) {
+        if (attempts < 15) {
+          attempts++;
+          timer = setTimeout(setupGoogleIdentity, 200);
+        } else if (isMounted) {
+          setGisLoaded(false);
+        }
+        return;
+      }
+
+      if (!isMounted) return;
+      setGisLoaded(true);
+
+      try {
+        window.google.accounts.id.initialize({
+          client_id: config.googleClientId,
+          callback: async (response) => {
+            if (!response?.credential) {
+              setError('Google authentication failed. Please try again.');
+              return;
+            }
+            setError(null);
+            try {
+              await loginWithGoogleToken(response.credential);
+              close();
+            } catch (err: any) {
+              setError(err.message || 'Account verification failed. Please try again.');
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          context: 'signin',
+          ux_mode: 'popup',
+        });
+
+        if (buttonContainerRef.current) {
+          buttonContainerRef.current.innerHTML = '';
+          window.google.accounts.id.renderButton(buttonContainerRef.current, {
+            type: 'standard',
+            theme: 'outline',
+            size: 'large',
+            text: 'continue_with',
+            shape: 'pill',
+            logo_alignment: 'left',
+            width: 320,
+          });
+        }
+
+        // Prompt Google's native account chooser / One Tap
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed()) {
+            console.debug('Google account prompt not displayed:', notification.getNotDisplayedReason?.());
+          }
+        });
+      } catch (e: any) {
+        console.error('Error initializing Google Identity Services:', e);
+        setError('Failed to initialize Google Sign-In. Please check your network connection.');
+      }
+    };
+
+    setupGoogleIdentity();
+
+    return () => {
+      isMounted = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [isOpen, close, loginWithGoogleToken]);
 
   if (!isOpen) return null;
 
-  const handleQuickLogin = async (name: string, email: string) => {
+  const handleManualTrigger = () => {
     setError(null);
-    try {
-      const mockId = `mock-user:g_${encodeURIComponent(email)}:${encodeURIComponent(name)}:${encodeURIComponent(email)}`;
-      await loginWithGoogleToken(mockId);
-      close();
-    } catch (err: any) {
-      setError(err.message || 'Login failed');
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.prompt();
+    } else {
+      setError('Loading Google authentication services... Please try again in a moment.');
     }
-  };
-
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customName.trim() || !customEmail.trim()) {
-      setError('Please provide both your name and email');
-      return;
-    }
-    void handleQuickLogin(customName.trim(), customEmail.trim());
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
       <div
         className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#161324] p-6 shadow-2xl text-white"
         role="dialog"
@@ -77,7 +139,7 @@ export function GoogleSignInModal() {
         {/* Close Button */}
         <button
           onClick={close}
-          className="absolute top-4 right-4 p-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           aria-label="Close"
         >
           <X size={18} />
@@ -85,121 +147,81 @@ export function GoogleSignInModal() {
 
         {/* Header with Aroma Logo */}
         <div className="flex flex-col items-center text-center mt-2 mb-6">
-          <div className="mb-3 p-3 rounded-2xl bg-gradient-to-tr from-[#6842ff]/30 to-[#9d50bb]/20 border border-white/10">
+          <div className="mb-3 p-3 rounded-2xl bg-gradient-to-tr from-[#6842ff]/30 to-[#9d50bb]/20 border border-white/10 shadow-lg">
             <AromaLogo className="size-10 text-white" />
           </div>
-          <h2 id="signin-modal-title" className="text-xl font-bold tracking-tight">
+          <h2 id="signin-modal-title" className="text-xl font-bold tracking-tight text-white">
             Sign in to Aroma
           </h2>
-          <p className="mt-1 text-xs text-white/60 max-w-xs">
+          <p className="mt-1 text-xs text-white/60 max-w-xs leading-relaxed">
             Unlock your library, playlists, liked music, and synchronized playback across devices.
           </p>
         </div>
 
+        {/* Error notification banner */}
         {error && (
-          <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-xs text-red-300">
-            {error}
+          <div className="mb-4 rounded-xl bg-red-500/15 border border-red-500/40 p-3.5 text-xs text-red-200 flex items-start gap-2.5 animate-in fade-in">
+            <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1 font-medium leading-relaxed">{error}</div>
           </div>
         )}
 
-        {/* Primary Google Sign-In Button */}
-        <div className="space-y-3">
-          <button
-            type="button"
-            disabled={isLoading}
-            onClick={() => handleQuickLogin('Soma Sekhar', 'soma@example.com')}
-            className="flex w-full items-center justify-center gap-3 rounded-xl bg-white px-4 py-3 font-medium text-gray-800 shadow hover:bg-gray-100 active:scale-[0.99] transition-all disabled:opacity-60 cursor-pointer"
-          >
-            {isLoading ? <Loader2 size={18} className="animate-spin text-gray-600" /> : <GoogleLogo size={20} />}
-            <span>Continue with Google</span>
-          </button>
-
-          <div className="relative flex py-2 items-center">
-            <div className="flex-grow border-t border-white/10" />
-            <span className="flex-shrink mx-3 text-[11px] uppercase tracking-wider text-white/40">or choose account</span>
-            <div className="flex-grow border-t border-white/10" />
-          </div>
-
-          {/* Account Choices */}
-          <div className="grid grid-cols-1 gap-2">
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickLogin('Soma Sekhar', 'somasekhar@gmail.com')}
-              className="flex items-center gap-3 w-full p-2.5 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 text-left transition-colors"
-            >
-              <div className="size-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-semibold text-sm">
-                S
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm truncate">Soma Sekhar</div>
-                <div className="text-xs text-white/50 truncate">somasekhar@gmail.com</div>
-              </div>
-              <UserCheck size={16} className="text-[#a78bfa] mr-1 flex-shrink-0" />
-            </button>
-
-            <button
-              type="button"
-              disabled={isLoading}
-              onClick={() => handleQuickLogin('New Listener', 'newlistener@gmail.com')}
-              className="flex items-center gap-3 w-full p-2.5 rounded-xl border border-white/5 bg-white/5 hover:bg-white/10 text-left transition-colors"
-            >
-              <div className="size-9 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center font-semibold text-sm">
-                N
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-medium text-sm truncate">New User Account</div>
-                <div className="text-xs text-white/50 truncate">newlistener@gmail.com</div>
-              </div>
-              <Music size={16} className="text-emerald-400 mr-1 flex-shrink-0" />
-            </button>
-          </div>
-
-          {/* Toggle Custom Account */}
-          {!showManual ? (
-            <button
-              type="button"
-              onClick={() => setShowManual(true)}
-              className="w-full text-center text-xs text-white/50 hover:text-white/80 py-1 transition-colors"
-            >
-              Sign in with another Google account
-            </button>
+        {/* Official Google Identity Services Container */}
+        <div className="flex flex-col items-center justify-center min-h-[50px] my-2">
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-3 text-sm text-white/70">
+              <Loader2 size={20} className="animate-spin text-[#9d50bb]" />
+              <span>Verifying Google account...</span>
+            </div>
           ) : (
-            <form onSubmit={handleManualSubmit} className="pt-2 space-y-2.5 border-t border-white/10">
-              <div>
-                <label className="block text-[11px] font-medium text-white/60 mb-1">Display Name</label>
-                <input
-                  type="text"
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="e.g. Alex Miller"
-                  className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-indigo-400"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-white/60 mb-1">Google Email</label>
-                <input
-                  type="email"
-                  value={customEmail}
-                  onChange={(e) => setCustomEmail(e.target.value)}
-                  placeholder="alex@gmail.com"
-                  className="w-full rounded-lg bg-black/40 border border-white/10 px-3 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-indigo-400"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full rounded-lg bg-indigo-600 hover:bg-indigo-500 py-2 text-xs font-semibold text-white transition-colors"
-              >
-                Sign In with this Account
-              </button>
-            </form>
+            <div className="w-full flex flex-col items-center">
+              {/* Google's official rendered button */}
+              <div
+                ref={buttonContainerRef}
+                className="w-full flex justify-center min-h-[44px]"
+              />
+
+              {/* Fallback button if GIS script is delayed or blocked */}
+              {!gisLoaded && (
+                <button
+                  type="button"
+                  onClick={handleManualTrigger}
+                  className="flex w-full max-w-[320px] items-center justify-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 font-medium text-white shadow hover:bg-white/15 transition-all cursor-pointer"
+                >
+                  <GoogleLogo size={18} />
+                  <span>Continue with Google</span>
+                </button>
+              )}
+            </div>
           )}
+        </div>
+
+        {/* Security & Verification Guarantees */}
+        <div className="mt-6 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-left">
+          <div className="flex items-center gap-2 text-xs font-semibold text-white/90 mb-1.5">
+            <ShieldCheck size={15} className="text-emerald-400" />
+            <span>Official Google Authentication</span>
+          </div>
+          <p className="text-[11px] text-white/50 leading-relaxed">
+            Aroma requests only standard openid identity scopes (email, profile).
+            Accounts are cryptographically verified by Google and protected against unauthorized access.
+          </p>
+          <div className="mt-2 flex items-center gap-3 text-[10px] text-white/40">
+            <span className="flex items-center gap-1">
+              <CheckCircle2 size={11} className="text-emerald-400" /> Real Google IDs only
+            </span>
+            <span className="flex items-center gap-1">
+              <CheckCircle2 size={11} className="text-emerald-400" /> Verified emails only
+            </span>
+            <span className="flex items-center gap-1">
+              <CheckCircle2 size={11} className="text-emerald-400" /> Isolated user data
+            </span>
+          </div>
         </div>
 
         {/* Footer */}
         <div className="mt-5 text-center text-[11px] text-white/40">
-          By continuing, you agree to Aroma&apos;s terms and privacy standards.
+          By signing in, you agree to Aroma&apos;s terms of service and privacy standards.
         </div>
       </div>
     </div>
