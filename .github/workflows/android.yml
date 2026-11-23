@@ -8,6 +8,8 @@ on:
 jobs:
   build-android-apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout Repository
@@ -47,9 +49,9 @@ jobs:
     - name: Build Android APK
       run: |
         if [ "$HAS_KEYSTORE" = "true" ]; then
-          ./gradlew assembleProdRelease
+          ./gradlew assembleProdRelease -Pbitchord.bundleWear=false
         else
-          ./gradlew assembleProdDebug
+          ./gradlew assembleProdDebug -Pbitchord.bundleWear=false
         fi
 
     - name: Find and Prepare APK for Artifact
@@ -63,6 +65,26 @@ jobs:
       with:
         name: Aroma-Music-Android-APK
         path: release-apk/Aroma-Music.apk
+
+    - name: Publish Release to GitHub
+      uses: softprops/action-gh-release@v2
+      if: github.ref == 'refs/heads/main'
+      with:
+        tag_name: app-latest
+        name: "Aroma Music Android App (Latest APK)"
+        body: |
+          Official Aroma Music Android App (Latest Build).
+          
+          Features:
+          - Official Aroma glowing violet theme and launcher icon
+          - High-fidelity streaming with background audio and offline caching
+          - Native YouTube Music playback without bot detection
+          - Automatic sync with Listen Together and Aroma Web
+        draft: false
+        prerelease: false
+        files: release-apk/Aroma-Music.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload Wear OS APK Artifact
       if: always()

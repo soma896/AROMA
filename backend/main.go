@@ -291,7 +291,12 @@ func createYTProxy(originHost, prefix string) http.HandlerFunc {
 			}
 			req.Header.Set("Origin", originHost)
 			req.Header.Set("Referer", originHost+"/")
-			if req.Header.Get("User-Agent") == "" {
+			if strings.Contains(req.URL.Path, "/youtubei/v1/player") {
+				req.Header.Set("User-Agent", "com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip")
+				req.Header.Set("X-Youtube-Client-Name", "3")
+				req.Header.Set("X-Youtube-Client-Version", "21.03.36")
+				req.Header.Set("X-GOOG-API-FORMAT-VERSION", "2")
+			} else if req.Header.Get("User-Agent") == "" {
 				req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 			}
 			req.Header.Del("Cookie")
