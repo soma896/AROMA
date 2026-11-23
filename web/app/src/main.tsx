@@ -8,6 +8,17 @@ import '@/styles/global.css';
 
 const router = createBrowserRouter(routes);
 
+// Register PWA service worker for installability
+if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .catch((err) => {
+        console.warn('PWA service worker registration failed:', err);
+      });
+  });
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

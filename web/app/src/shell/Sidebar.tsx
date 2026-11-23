@@ -1,4 +1,4 @@
-import { ArrowUpRight, Heart, ListMusic, Settings } from 'lucide-react';
+import { ArrowUpRight, Download, Heart, ListMusic, Settings } from 'lucide-react';
 import { MdOutlineExtension } from 'react-icons/md';
 import { useAuth } from '@/auth/useAuth';
 import { PrefetchLink, PrefetchNavLink } from '@/components/PrefetchLink';
@@ -22,6 +22,7 @@ import { useLibraryPlaylists, useSignedIn } from '@/data/music/queries';
 import { useSpotifyPlaylists } from '@/data/spotify/queries';
 import { useExtensionUpdate } from '@/extension/useExtensionUpdate';
 import { useSpotifySignedIn } from '@/extension/useSpotifyAuth';
+import { usePwaInstall } from '@/lib/usePwaInstall';
 import { useUi } from '@/state/ui';
 import { AccountButton } from './AccountButton';
 
@@ -160,6 +161,7 @@ export function Sidebar() {
   const update = useExtensionUpdate();
   const signedIn = useSignedIn();
   const spotifySignedIn = useSpotifySignedIn();
+  const { canInstall, isInstalled, promptInstall } = usePwaInstall();
   const close = () => setDrawerOpen(false);
 
   return (
@@ -193,6 +195,25 @@ export function Sidebar() {
               </span>
             )}
           </PrefetchNavLink>
+          {!isInstalled && (
+            <button
+              type="button"
+              className={item}
+              onClick={() => {
+                close();
+                void promptInstall();
+              }}
+              title="Install Aroma as desktop or mobile app"
+            >
+              <span className={icon}>
+                <Download size={18} />
+              </span>
+              <span className={navLabel}>Install App</span>
+              <span className="ml-auto rounded-[10px] bg-gradient-to-r from-purple-500 to-indigo-500 px-[7px] py-0.5 type-subhead-emphasized text-white shadow-sm">
+                App
+              </span>
+            </button>
+          )}
           <AccountButton />
           <div className="flex items-center justify-between">
             <a className="inline-flex items-center gap-1 ps-1 type-callout text-primary hover:underline" href={config.androidAppUrl} target="_blank" rel="noreferrer">
