@@ -104,7 +104,7 @@ var (
 	TrustProxy           = getBool("JAM_TRUST_PROXY", false)
 	PublicOrigin         = getOrigin("JAM_PUBLIC_ORIGIN")
 	Port                 = getInt("PORT", 9000)
-	GoogleClientID       = getString("GOOGLE_CLIENT_ID", "")
+	GoogleClientID       = getString("GOOGLE_CLIENT_ID", "534490679821-f2l3d1qp5sdv1bvhrq6b7jf0du1n2319.apps.googleusercontent.com")
 )
 
 // Open-app heartbeats. The interval is handed back on every ping, so it can be
