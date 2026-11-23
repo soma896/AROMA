@@ -37,27 +37,32 @@ jobs:
             echo "keyAlias=${{ secrets.KEY_ALIAS }}"
             echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
           } > keystore.properties
-          echo "HAS_KEYSTORE=true" >> $GITHUB_ENV
-        else
-          echo "No release keystore found, will build debuggable prod APK"
-          echo "HAS_KEYSTORE=false" >> $GITHUB_ENV
+        elif [ -f "aroma.jks" ]; then
+          echo "Using repository Aroma keystore..."
+          {
+            echo "storeFile=aroma.jks"
+            echo "storePassword=aromamusic"
+            echo "keyAlias=aroma"
+            echo "keyPassword=aromamusic"
+          } > keystore.properties
         fi
+        echo "HAS_KEYSTORE=true" >> $GITHUB_ENV
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
     - name: Build Android APK
       run: |
-        if [ "$HAS_KEYSTORE" = "true" ]; then
-          ./gradlew assembleProdRelease -Pbitchord.bundleWear=false
-        else
-          ./gradlew assembleProdDebug -Pbitchord.bundleWear=false
-        fi
+        ./gradlew assembleProdRelease -Pbitchord.bundleWear=false
 
     - name: Find and Prepare APK for Artifact
       run: |
         mkdir -p release-apk
-        find app/build/outputs/apk/ -name "*.apk" -exec cp {} release-apk/Aroma-Music.apk \;
+        if find app/build/outputs/apk/ -name "*prod*release*.apk" | grep -q .; then
+          find app/build/outputs/apk/ -name "*prod*release*.apk" -exec cp {} release-apk/Aroma-Music.apk \;
+        else
+          find app/build/outputs/apk/ -name "*.apk" -exec cp {} release-apk/Aroma-Music.apk \;
+        fi
         ls -la release-apk/
 
     - name: Upload APK Artifact

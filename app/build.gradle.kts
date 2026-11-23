@@ -82,7 +82,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.music.bitchord"
+        applicationId = "com.aroma.music"
         // 26 keeps reach wide; real-time blur (RenderEffect) kicks in on API 31+,
         // Haze falls back to a translucent scrim below that.
         minSdk = 26
@@ -140,11 +140,12 @@ android {
     productFlavors {
         create("dev") {
             dimension = "env"
-            applicationId = "com.dev.bitchord"
+            applicationId = "com.dev.aroma.music"
             resValue("string", "app_name", "Aroma Dev")
         }
         create("prod") {
             dimension = "env"
+            applicationId = "com.aroma.music"
             // Matches defaultConfig — this is the package already shipped/installed.
         }
     }
