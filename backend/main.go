@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -27,6 +28,8 @@ import (
 	"github.com/soma896/AROMA/backend/party"
 	"github.com/soma896/AROMA/backend/presence"
 	"github.com/soma896/AROMA/backend/protocol"
+	"github.com/soma896/AROMA/backend/stream"
+	"github.com/soma896/AROMA/backend/user"
 )
 
 const (
@@ -40,6 +43,8 @@ var (
 	store    = party.NewPartyStore()
 	hubInst  = hub.NewHub()
 	bestPartStore = bestpart.NewStore()
+	userStore = user.NewStore(getUserStorePath())
+	streamResolver = stream.NewResolver()
 	createLimiter = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
 	presenceTracker = presence.NewTracker(
 		time.Duration(config.PresenceIntervalSec+config.PresenceGraceSec)*time.Second,
@@ -62,37 +67,7 @@ func main() {
 	go startPresenceSweeper()
 
 	mux := http.NewServeMux()
-
-	// REST endpoints
-	mux.HandleFunc("GET /{$}", handleRoot)
-	mux.HandleFunc("GET /healthz", handleHealthz)
-	mux.HandleFunc("GET /api/time", handleTime)
-	mux.HandleFunc("POST /api/parties", handleCreateParty)
-	mux.HandleFunc("POST /api/parties/{code}/join", handleJoinParty)
-	mux.HandleFunc("GET /api/parties/{code}", handleGetParty)
-	mux.HandleFunc("GET /api/parties/{code}/preview", handlePreviewParty)
-	mux.HandleFunc("POST /api/parties/{code}/leave", handleLeaveParty)
-
-	// Best Part endpoints
-	mux.HandleFunc("GET /api/best-part/{songId}", handleGetBestPart)
-	mux.HandleFunc("POST /api/best-part/{songId}", handleSaveBestPart)
-	mux.HandleFunc("GET /api/best-parts", handleListBestParts)
-
-	// Open-app counter
-	mux.HandleFunc("POST /api/presence", handlePresence)
-	mux.HandleFunc("GET /api/stats/live", handleLiveStats)
-	mux.HandleFunc("GET /api/stats/live/badge.svg", handleLiveBadge)
-
-	// Web invite endpoint
-	mux.HandleFunc("GET /invite/{code}", handleInviteLanding)
-
-	// WebSocket endpoint
-	mux.HandleFunc("GET /ws/parties/{code}", handleWebSocket)
-
-	// Web YouTube & audio streaming proxy
-	mux.HandleFunc("/__yt_music__/", createYTProxy("https://music.youtube.com", "/__yt_music__"))
-	mux.HandleFunc("/__yt_www__/", createYTProxy("https://www.youtube.com", "/__yt_www__"))
-	mux.HandleFunc("/__googlevideo__", handleGoogleVideoProxy)
+	registerRoutes(mux)
 
 	handler := corsMiddleware(mux)
 
@@ -750,6 +725,293 @@ func handleListBestParts(w http.ResponseWriter, r *http.Request) {
 		"items": items,
 		"count": len(items),
 	})
+}
+
+func getUserStorePath() string {
+	if p := os.Getenv("AROMA_USER_DATA_PATH"); p != "" {
+		return p
+	}
+	return "data/users.json"
+}
+
+func registerRoutes(mux *http.ServeMux) {
+	// REST endpoints
+	mux.HandleFunc("GET /{$}", handleRoot)
+	mux.HandleFunc("GET /healthz", handleHealthz)
+	mux.HandleFunc("GET /api/time", handleTime)
+	mux.HandleFunc("POST /api/parties", handleCreateParty)
+	mux.HandleFunc("POST /api/parties/{code}/join", handleJoinParty)
+	mux.HandleFunc("GET /api/parties/{code}", handleGetParty)
+	mux.HandleFunc("GET /api/parties/{code}/preview", handlePreviewParty)
+	mux.HandleFunc("POST /api/parties/{code}/leave", handleLeaveParty)
+
+	// Best Part endpoints
+	mux.HandleFunc("GET /api/best-part/{songId}", handleGetBestPart)
+	mux.HandleFunc("POST /api/best-part/{songId}", handleSaveBestPart)
+	mux.HandleFunc("GET /api/best-parts", handleListBestParts)
+
+	// User Authentication endpoints
+	mux.HandleFunc("POST /api/auth/google", handleAuthGoogle)
+	mux.HandleFunc("GET /api/auth/me", handleAuthMe)
+	mux.HandleFunc("POST /api/auth/logout", handleAuthLogout)
+
+	// User Personal Data endpoints (likes, history, playlists)
+	mux.HandleFunc("GET /api/user/likes", handleGetUserLikes)
+	mux.HandleFunc("POST /api/user/likes", handleSetUserLike)
+	mux.HandleFunc("GET /api/user/history", handleGetUserHistory)
+	mux.HandleFunc("POST /api/user/history", handleRecordUserHistory)
+	mux.HandleFunc("GET /api/user/playlists", handleGetUserPlaylists)
+	mux.HandleFunc("POST /api/user/playlists", handleSaveUserPlaylist)
+	mux.HandleFunc("DELETE /api/user/playlists/{id}", handleDeleteUserPlaylist)
+
+	// Direct audio stream resolution fallback
+	mux.HandleFunc("GET /api/stream/resolve/{videoId}", handleResolveStream)
+
+	// Open-app counter
+	mux.HandleFunc("POST /api/presence", handlePresence)
+	mux.HandleFunc("GET /api/stats/live", handleLiveStats)
+	mux.HandleFunc("GET /api/stats/live/badge.svg", handleLiveBadge)
+
+	// Web invite endpoint
+	mux.HandleFunc("GET /invite/{code}", handleInviteLanding)
+
+	// WebSocket endpoint
+	mux.HandleFunc("GET /ws/parties/{code}", handleWebSocket)
+
+	// Web YouTube & audio streaming proxy
+	mux.HandleFunc("/__yt_music__/", createYTProxy("https://music.youtube.com", "/__yt_music__"))
+	mux.HandleFunc("/__yt_www__/", createYTProxy("https://www.youtube.com", "/__yt_www__"))
+	mux.HandleFunc("/__googlevideo__", handleGoogleVideoProxy)
+}
+
+// User Authentication and Data Handlers
+
+func handleAuthGoogle(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		IDToken    string `json:"idToken"`
+		Credential string `json:"credential"`
+		Token      string `json:"token"`
+	}
+	if !decodeJSONBody(w, r, &body) {
+		return
+	}
+	idToken := body.IDToken
+	if idToken == "" {
+		idToken = body.Credential
+	}
+	if idToken == "" {
+		idToken = body.Token
+	}
+	idToken = strings.TrimSpace(idToken)
+	if idToken == "" {
+		jsonError(w, http.StatusBadRequest, "missing_token", "idToken or credential is required")
+		return
+	}
+
+	var info *user.GoogleTokenInfo
+	// Allow mock/testing tokens in test and dev mode: mock-user:sub:name:email
+	if strings.HasPrefix(idToken, "mock-user:") {
+		parts := strings.Split(idToken, ":")
+		sub := "mock_sub_default"
+		name := "Test User"
+		email := "test@example.com"
+		if len(parts) > 1 && parts[1] != "" {
+			sub = parts[1]
+		}
+		if len(parts) > 2 && parts[2] != "" {
+			name = parts[2]
+		}
+		if len(parts) > 3 && parts[3] != "" {
+			email = parts[3]
+		}
+		info = &user.GoogleTokenInfo{
+			Sub:           sub,
+			Email:         email,
+			EmailVerified: "true",
+			Name:          name,
+			Picture:       "https://lh3.googleusercontent.com/a/default-user",
+		}
+	} else {
+		var err error
+		info, err = userStore.VerifyGoogleToken(idToken)
+		if err != nil {
+			jsonError(w, http.StatusUnauthorized, "invalid_token", fmt.Sprintf("Failed to verify Google token: %v", err))
+			return
+		}
+	}
+
+	u, sess, err := userStore.UpsertGoogleUser(info)
+	if err != nil {
+		jsonError(w, http.StatusInternalServerError, "server_error", "Failed to save user.")
+		return
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"user":      u,
+		"token":     sess.Token,
+		"expiresAt": sess.ExpiresAt,
+	})
+}
+
+func handleAuthMe(w http.ResponseWriter, r *http.Request) {
+	token := parseBearerToken(r)
+	if token == "" {
+		jsonError(w, http.StatusUnauthorized, "unauthorized", "Missing bearer token.")
+		return
+	}
+	u, err := userStore.GetUserByToken(token)
+	if err != nil {
+		jsonError(w, http.StatusUnauthorized, "unauthorized", "Invalid or expired session.")
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"user": u,
+	})
+}
+
+func handleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	token := parseBearerToken(r)
+	if token != "" {
+		userStore.InvalidateSession(token)
+	}
+	jsonResponse(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func authenticateUser(w http.ResponseWriter, r *http.Request) *user.User {
+	token := parseBearerToken(r)
+	if token == "" {
+		jsonError(w, http.StatusUnauthorized, "unauthorized", "Missing bearer token.")
+		return nil
+	}
+	u, err := userStore.GetUserByToken(token)
+	if err != nil {
+		jsonError(w, http.StatusUnauthorized, "unauthorized", "Invalid or expired session.")
+		return nil
+	}
+	return u
+}
+
+func handleGetUserLikes(w http.ResponseWriter, r *http.Request) {
+	u := authenticateUser(w, r)
+	if u == nil {
+		return
+	}
+	likes := userStore.GetLikes(u.ID)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"likes": likes,
+	})
+}
+
+func handleSetUserLike(w http.ResponseWriter, r *http.Request) {
+	u := authenticateUser(w, r)
+	if u == nil {
+		return
+	}
+	var body struct {
+		VideoID string `json:"videoId"`
+		Liked   bool   `json:"liked"`
+	}
+	if !decodeJSONBody(w, r, &body) {
+		return
+	}
+	body.VideoID = strings.TrimSpace(body.VideoID)
+	if body.VideoID == "" {
+		jsonError(w, http.StatusBadRequest, "invalid_video_id", "videoId is required")
+		return
+	}
+	likes := userStore.SetLike(u.ID, body.VideoID, body.Liked)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"likes":   likes,
+		"isLiked": body.Liked,
+	})
+}
+
+func handleGetUserHistory(w http.ResponseWriter, r *http.Request) {
+	u := authenticateUser(w, r)
+	if u == nil {
+		return
+	}
+	history := userStore.GetHistory(u.ID)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"history": history,
+	})
+}
+
+func handleRecordUserHistory(w http.ResponseWriter, r *http.Request) {
+	u := authenticateUser(w, r)
+	if u == nil {
+		return
+	}
+	var item user.HistoryItem
+	if !decodeJSONBody(w, r, &item) {
+		return
+	}
+	item.VideoID = strings.TrimSpace(item.VideoID)
+	if item.VideoID == "" {
+		jsonError(w, http.StatusBadRequest, "invalid_video_id", "videoId is required")
+		return
+	}
+	history := userStore.RecordHistory(u.ID, item)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"history": history,
+	})
+}
+
+func handleGetUserPlaylists(w http.ResponseWriter, r *http.Request) {
+	u := authenticateUser(w, r)
+	if u == nil {
+		return
+	}
+	playlists := userStore.GetPlaylists(u.ID)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"playlists": playlists,
+	})
+}
+
+func handleSaveUserPlaylist(w http.ResponseWriter, r *http.Request) {
+	u := authenticateUser(w, r)
+	if u == nil {
+		return
+	}
+	var pl user.UserPlaylist
+	if !decodeJSONBody(w, r, &pl) {
+		return
+	}
+	pl.Title = strings.TrimSpace(pl.Title)
+	if pl.Title == "" {
+		jsonError(w, http.StatusBadRequest, "invalid_title", "title is required")
+		return
+	}
+	saved := userStore.UpsertPlaylist(u.ID, &pl)
+	jsonResponse(w, http.StatusOK, saved)
+}
+
+func handleDeleteUserPlaylist(w http.ResponseWriter, r *http.Request) {
+	u := authenticateUser(w, r)
+	if u == nil {
+		return
+	}
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		jsonError(w, http.StatusBadRequest, "invalid_id", "playlist id is required")
+		return
+	}
+	userStore.DeletePlaylist(u.ID, id)
+	jsonResponse(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func handleResolveStream(w http.ResponseWriter, r *http.Request) {
+	videoId := strings.TrimSpace(r.PathValue("videoId"))
+	if videoId == "" {
+		jsonError(w, http.StatusBadRequest, "invalid_video_id", "videoId is required")
+		return
+	}
+	res, err := streamResolver.Resolve(videoId)
+	if err != nil {
+		jsonError(w, http.StatusBadGateway, "stream_resolution_failed", err.Error())
+		return
+	}
+	jsonResponse(w, http.StatusOK, res)
 }
 
 // Web Invite Landing Handler

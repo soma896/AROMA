@@ -187,7 +187,8 @@ const BOT_CHALLENGE = /not a bot|confirm you.re not a bot|bot detection/;
 function permanentReason(status: string | undefined, reason: string | undefined, signedIn: boolean): string | null {
   const text = (reason ?? '').toLowerCase();
   if (BOT_CHALLENGE.test(text)) {
-    return 'YouTube anti-bot verification required. Install the AROMA Extension (bottom-left) to play songs in the browser.';
+    // Do not mark as permanently unplayable; allow other clients or backend stream fallback to play
+    return null;
   }
   if (AGE_GATE.test(text)) {
     return signedIn

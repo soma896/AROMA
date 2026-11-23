@@ -1,5 +1,6 @@
-import { ArrowUpRight, ListMusic, Settings } from 'lucide-react';
+import { ArrowUpRight, Heart, ListMusic, Settings } from 'lucide-react';
 import { MdOutlineExtension } from 'react-icons/md';
+import { useAuth } from '@/auth/useAuth';
 import { PrefetchLink, PrefetchNavLink } from '@/components/PrefetchLink';
 import { AromaLogo } from '@/components/icons/AromaLogo';
 import {
@@ -78,6 +79,7 @@ function NavList({ items, onNavigate }: { items: NavItem[]; onNavigate: () => vo
 /** Library and Playlists (report §1), once YouTube requests are made as the user. */
 function LibraryNav({ onNavigate }: { onNavigate: () => void }) {
   const playlists = useLibraryPlaylists();
+  const aromaPlaylists = useAuth((s) => s.playlists);
   return (
     <>
       <h2 className={sectionHeader}>Library</h2>
@@ -90,6 +92,24 @@ function LibraryNav({ onNavigate }: { onNavigate: () => void }) {
             <span className={navLabel}>{LIBRARY_SECTIONS.playlists.title}</span>
           </PrefetchNavLink>
         </li>
+        <li>
+          <PrefetchNavLink to="/library/songs" className={item} onClick={onNavigate}>
+            <span className={icon}>
+              <Heart size={18} strokeWidth={2} />
+            </span>
+            <span className={navLabel}>Liked Music</span>
+          </PrefetchNavLink>
+        </li>
+        {aromaPlaylists?.map((playlist) => (
+          <li key={playlist.id}>
+            <PrefetchNavLink to={`/playlist/${encodeURIComponent(playlist.id)}`} className={item} onClick={onNavigate}>
+              <span className={icon}>
+                <ListMusic size={17} strokeWidth={1.8} />
+              </span>
+              <span className={navLabel}>{playlist.title}</span>
+            </PrefetchNavLink>
+          </li>
+        ))}
         {playlists.data?.map((playlist) => (
           <li key={playlist.id}>
             <PrefetchNavLink to={hrefFor(playlist) ?? '/library/playlists'} className={item} onClick={onNavigate}>

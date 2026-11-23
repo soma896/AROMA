@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import type { DetectedExtension } from '@bitchord/shared/bridge';
 import { extensionQueryKey, useExtension } from '@/extension/useExtension';
 import { useYtAuth, ytAuthSnapshot } from '@/extension/useYtAuth';
+import { useAuth } from '@/auth/useAuth';
 import { queryClient } from '@/lib/queryClient';
 import {
   addToPlaylist,
@@ -165,10 +166,11 @@ export function prefetchPageData(pathname: string): void {
 
 // ---- Signed in (prompt §5.3) ------------------------------------------------------
 
-/** True when YouTube requests are made as the user (the extension reports a chosen channel). */
+/** True when YouTube requests are made as the user, or when authenticated with Aroma account. */
 export function useSignedIn(): boolean {
   const auth = useYtAuth();
-  return auth.state === 'ready' && auth.auth.signedIn;
+  const isAromaAuthed = useAuth((s) => s.isAuthenticated);
+  return isAromaAuthed || (auth.state === 'ready' && auth.auth.signedIn);
 }
 
 type LibraryPageParam = (() => Promise<Paged<BrowsePage>>) | null;

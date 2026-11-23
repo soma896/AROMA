@@ -215,6 +215,15 @@ export class YouTubeEngine {
       }
       throw lastError instanceof Error ? lastError : new Error('No YouTube client could stream this track');
     } catch (error) {
+      if (error instanceof SupersededError) throw error;
+      trackLog.w(`Standard playback resolution failed (${describe(error)}); trying backend stream resolution fallback`, videoId);
+      try {
+        const fallbackTrack = await this.loadBackendFallback(videoId, startSec, autoplay, generation);
+        trackLog.i(`Playback started successfully via backend stream fallback for ${videoId}`);
+        return fallbackTrack;
+      } catch (fallbackError) {
+        trackLog.e(`Backend stream fallback also failed: ${describe(fallbackError)}`, videoId);
+      }
       if (!(error instanceof SupersededError)) {
         trackLog.e(`load failed: ${describe(error)}`, videoId);
       }
@@ -226,6 +235,63 @@ export class YouTubeEngine {
 
   private checkCurrent(generation: number) {
     if (generation !== this.generation) throw new SupersededError('Replaced by a newer load');
+  }
+
+  private async loadBackendFallback(
+    videoId: string,
+    startSec: number,
+    autoplay: boolean,
+    generation: number,
+  ): Promise<LoadedTrack> {
+    const proxyBase = config.partyServerUrl ? config.partyServerUrl.replace(/\/$/, '') : '';
+    const res = await fetch(`${proxyBase}/api/stream/resolve/${encodeURIComponent(videoId)}`);
+    if (!res.ok) {
+      throw new Error(`Fallback stream resolution failed: ${res.statusText}`);
+    }
+    const data = await res.json();
+    if (!data.bestAudio?.url && (!data.formats || data.formats.length === 0)) {
+      throw new Error('No audio format available from fallback stream service');
+    }
+    const best = data.bestAudio || data.formats[0];
+    const streamUrl = `${proxyBase}/__googlevideo__?url=${encodeURIComponent(best.url)}`;
+
+    this.checkCurrent(generation);
+    if (this.player) {
+      await this.player.unload().catch(() => {});
+    }
+    this.adapter?.dispose();
+    this.adapter = null;
+
+    this.audio.src = streamUrl;
+    this.audio.currentTime = startSec;
+    if (autoplay) {
+      await this.audio.play().catch((err: unknown) => {
+        if (err instanceof DOMException && err.name === 'NotAllowedError') {
+          trackLog.w('autoplay was blocked by the browser; waiting for a tap', videoId);
+        } else {
+          throw err;
+        }
+      });
+    }
+
+    return {
+      videoId,
+      title: data.title || '',
+      author: data.author || '',
+      durationSec: data.durationSec || 0,
+      thumbnails: [],
+      client: 'VISIONOS',
+      format: `${best.itag || 140} direct fallback`,
+      stream: {
+        codec: best.mimeType?.includes('opus') ? 'Opus' : 'AAC',
+        itag: String(best.itag || 140),
+        bitrateKbps: Math.round((best.bitrate || 128000) / 1000),
+        sampleRateHz: 44100,
+        channels: 2,
+        mode: 'direct',
+      },
+      loudnessDb: null,
+    };
   }
 
   private async startStream(

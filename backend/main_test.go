@@ -23,25 +23,7 @@ func setupTestServer() *httptest.Server {
 	// Each test server starts with its own party-creation allowance.
 	createLimiter = newIPRateLimiter(time.Minute, config.CreateRatePerMinute, config.RateLimitMaxEntries)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /{$}", handleRoot)
-	mux.HandleFunc("GET /healthz", handleHealthz)
-	mux.HandleFunc("GET /api/time", handleTime)
-	mux.HandleFunc("POST /api/parties", handleCreateParty)
-	mux.HandleFunc("POST /api/parties/{code}/join", handleJoinParty)
-	mux.HandleFunc("GET /api/parties/{code}", handleGetParty)
-	mux.HandleFunc("POST /api/parties/{code}/leave", handleLeaveParty)
-	mux.HandleFunc("GET /api/best-part/{songId}", handleGetBestPart)
-	mux.HandleFunc("POST /api/best-part/{songId}", handleSaveBestPart)
-	mux.HandleFunc("GET /api/best-parts", handleListBestParts)
-	mux.HandleFunc("POST /api/presence", handlePresence)
-	mux.HandleFunc("GET /api/stats/live", handleLiveStats)
-	mux.HandleFunc("GET /api/stats/live/badge.svg", handleLiveBadge)
-	mux.HandleFunc("GET /invite/{code}", handleInviteLanding)
-	mux.HandleFunc("GET /ws/parties/{code}", handleWebSocket)
-	mux.HandleFunc("/__yt_music__/", createYTProxy("https://music.youtube.com", "/__yt_music__"))
-	mux.HandleFunc("/__yt_www__/", createYTProxy("https://www.youtube.com", "/__yt_www__"))
-	mux.HandleFunc("/__googlevideo__", handleGoogleVideoProxy)
-
+	registerRoutes(mux)
 	return httptest.NewServer(corsMiddleware(mux))
 }
 
@@ -631,5 +613,128 @@ func TestBestPartEndpoints(t *testing.T) {
 	_ = json.NewDecoder(listRes.Body).Decode(&listResp)
 	if count, ok := listResp["count"].(float64); !ok || count < 1 {
 		t.Fatalf("expected at least 1 item in list, got %v", listResp["count"])
+	}
+}
+
+func TestUserAuthAndDataEndpoints(t *testing.T) {
+	ts := setupTestServer()
+	defer ts.Close()
+
+	// 1. Invalid Google Login
+	badRes, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatalf("POST /api/auth/google error: %v", err)
+	}
+	if badRes.StatusCode != http.StatusBadRequest {
+		t.Fatalf("expected 400 for empty idToken, got %v", badRes.StatusCode)
+	}
+
+	// 2. Successful Google Login (User 1)
+	loginBody := `{"idToken": "mock-user:g_sub_alice:Alice:alice@example.com"}`
+	res1, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(loginBody))
+	if err != nil || res1.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/auth/google failed: status %v, err %v", res1.StatusCode, err)
+	}
+	var auth1 map[string]interface{}
+	_ = json.NewDecoder(res1.Body).Decode(&auth1)
+	token1, _ := auth1["token"].(string)
+	if token1 == "" {
+		t.Fatalf("expected session token for Alice")
+	}
+
+	// 3. /api/auth/me without token -> 401
+	meBad, err := http.Get(ts.URL + "/api/auth/me")
+	if err != nil || meBad.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for /api/auth/me without token, got %v", meBad.StatusCode)
+	}
+
+	// 4. /api/auth/me with Alice's token -> 200
+	reqMe, _ := http.NewRequest("GET", ts.URL+"/api/auth/me", nil)
+	reqMe.Header.Set("Authorization", "Bearer "+token1)
+	respMe, err := http.DefaultClient.Do(reqMe)
+	if err != nil || respMe.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200 for Alice /api/auth/me, got %v", respMe.StatusCode)
+	}
+
+	// 5. Alice Likes a Song
+	likeBody := `{"videoId": "video_abc_123", "liked": true}`
+	reqLike, _ := http.NewRequest("POST", ts.URL+"/api/user/likes", strings.NewReader(likeBody))
+	reqLike.Header.Set("Authorization", "Bearer "+token1)
+	reqLike.Header.Set("Content-Type", "application/json")
+	respLike, err := http.DefaultClient.Do(reqLike)
+	if err != nil || respLike.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/user/likes failed: status %v", respLike.StatusCode)
+	}
+
+	// 6. Alice Gets Likes
+	reqGetLikes, _ := http.NewRequest("GET", ts.URL+"/api/user/likes", nil)
+	reqGetLikes.Header.Set("Authorization", "Bearer "+token1)
+	respGetLikes, err := http.DefaultClient.Do(reqGetLikes)
+	if err != nil || respGetLikes.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/user/likes failed: status %v", respGetLikes.StatusCode)
+	}
+	var likesResp map[string]interface{}
+	_ = json.NewDecoder(respGetLikes.Body).Decode(&likesResp)
+	likesList, _ := likesResp["likes"].([]interface{})
+	if len(likesList) != 1 || likesList[0] != "video_abc_123" {
+		t.Fatalf("expected Alice to have 1 liked song 'video_abc_123', got %+v", likesResp)
+	}
+
+	// 7. Alice Records Play History
+	histBody := `{"videoId": "video_abc_123", "title": "Song 1", "artist": "Artist 1"}`
+	reqHist, _ := http.NewRequest("POST", ts.URL+"/api/user/history", strings.NewReader(histBody))
+	reqHist.Header.Set("Authorization", "Bearer "+token1)
+	reqHist.Header.Set("Content-Type", "application/json")
+	respHist, err := http.DefaultClient.Do(reqHist)
+	if err != nil || respHist.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/user/history failed: status %v", respHist.StatusCode)
+	}
+
+	// 8. User 2 (Bob) Logs in - Data Isolation Check
+	loginBody2 := `{"idToken": "mock-user:g_sub_bob:Bob:bob@example.com"}`
+	res2, err := http.Post(ts.URL+"/api/auth/google", "application/json", strings.NewReader(loginBody2))
+	if err != nil || res2.StatusCode != http.StatusOK {
+		t.Fatalf("Bob login failed: status %v", res2.StatusCode)
+	}
+	var auth2 map[string]interface{}
+	_ = json.NewDecoder(res2.Body).Decode(&auth2)
+	token2, _ := auth2["token"].(string)
+
+	// Bob's likes MUST be empty (never see Alice's liked song!)
+	reqBobLikes, _ := http.NewRequest("GET", ts.URL+"/api/user/likes", nil)
+	reqBobLikes.Header.Set("Authorization", "Bearer "+token2)
+	respBobLikes, err := http.DefaultClient.Do(reqBobLikes)
+	if err != nil || respBobLikes.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/user/likes for Bob failed: status %v", respBobLikes.StatusCode)
+	}
+	var bobLikesResp map[string]interface{}
+	_ = json.NewDecoder(respBobLikes.Body).Decode(&bobLikesResp)
+	bobLikesList, _ := bobLikesResp["likes"].([]interface{})
+	if len(bobLikesList) != 0 {
+		t.Fatalf("Bob should have 0 liked songs (isolated from Alice), got %+v", bobLikesList)
+	}
+
+	// 9. Alice Creates Playlist
+	plBody := `{"title": "My Chill Mix", "tracks": ["video_abc_123"]}`
+	reqPl, _ := http.NewRequest("POST", ts.URL+"/api/user/playlists", strings.NewReader(plBody))
+	reqPl.Header.Set("Authorization", "Bearer "+token1)
+	reqPl.Header.Set("Content-Type", "application/json")
+	respPl, err := http.DefaultClient.Do(reqPl)
+	if err != nil || respPl.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/user/playlists failed: status %v", respPl.StatusCode)
+	}
+
+	// 10. Logout Alice
+	reqLogout, _ := http.NewRequest("POST", ts.URL+"/api/auth/logout", nil)
+	reqLogout.Header.Set("Authorization", "Bearer "+token1)
+	respLogout, err := http.DefaultClient.Do(reqLogout)
+	if err != nil || respLogout.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/auth/logout failed: status %v", respLogout.StatusCode)
+	}
+
+	// 11. Alice calls /api/auth/me after logout -> 401
+	respMeAfterLogout, err := http.DefaultClient.Do(reqMe)
+	if err != nil || respMeAfterLogout.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("expected 401 for /api/auth/me after logout, got %v", respMeAfterLogout.StatusCode)
 	}
 }

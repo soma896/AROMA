@@ -41,18 +41,28 @@ export default function LibraryPage() {
   if (!isLibrarySection(section)) return <Navigate to="/home" replace />;
   const title = LIBRARY_SECTIONS[section].title;
   if (missing) return <NeedsExtension what="your library" />;
-  if (auth.state === 'ready' && !signedIn) {
+  if (!signedIn) {
     return (
       <>
         <PageHeader title={title} />
         <EmptyState
           title="Sign in to see your library"
-          detail="AROMA uses the YouTube Music account this browser is signed in to. Sign in on music.youtube.com, then come back."
+          detail="Sign in with your Google account to access your personal library, playlists, and recently played songs."
         />
       </>
     );
   }
-  if (library.isError && !library.data) return <LoadError error={library.error} onRetry={() => void library.refetch()} />;
+  if (library.isError && !library.data) {
+    return (
+      <>
+        <PageHeader title={title} />
+        <EmptyState
+          title={`No ${title.toLowerCase()} found`}
+          detail="Songs and items you listen to and like will appear here automatically."
+        />
+      </>
+    );
+  }
   if (!library.data) return <PlainSkeleton />;
 
   const grid = library.data.pages.flatMap((page) => page.data.grid);
@@ -60,7 +70,12 @@ export default function LibraryPage() {
   return (
     <>
       <PageHeader title={title} />
-      {!grid.length && !tracks.length && <EmptyState title="Nothing here yet" />}
+      {!grid.length && !tracks.length && (
+        <EmptyState
+          title="Nothing here yet"
+          detail="Your library will update as you play and like songs."
+        />
+      )}
       {grid.length > 0 && (
         <ul className={seeAllGrid} data-wide={grid.every((i) => i.wide) || undefined}>
           {grid.map((item, i) => (

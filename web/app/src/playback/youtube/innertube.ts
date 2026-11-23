@@ -187,7 +187,7 @@ async function signedFetch(input: RequestInfo | URL, init?: RequestInit): Promis
   if (!isInnertubeCall(url)) return simpleRequestFetch(input, init);
 
   const bridge = getBridge();
-  if (!bridge) throw new Error('Signed-in requests need the AROMA extension');
+  if (!bridge) return simpleRequestFetch(input, init);
   const method = (init?.method ?? request?.method ?? 'GET').toUpperCase() as 'GET' | 'POST';
   const headers: Record<string, string> = {};
   new Headers(init?.headers ?? request?.headers).forEach((value, key) => (headers[key] = value));
