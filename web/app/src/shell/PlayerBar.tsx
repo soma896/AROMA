@@ -145,53 +145,75 @@ export function PlayerBar() {
     </div>
     {/* Mobile compact player bar */}
     {hasTrack && (
-      <div className="pointer-events-auto fixed inset-x-2.5 bottom-3 z-[calc(var(--z-web-chrome)-1)] hidden max-sm:flex items-center justify-between rounded-2xl border border-white/10 bg-[#161622]/90 p-2 shadow-2xl backdrop-blur-xl">
-        <div
-          className="flex flex-1 min-w-0 items-center gap-2.5 cursor-pointer pr-2"
-          onClick={() => setFullScreen(true)}
-        >
-          {nowPlaying?.artworkUrl && (
-            <img
-              src={nowPlaying.artworkUrl}
-              alt=""
-              className="size-10 rounded-lg object-cover flex-none shadow-sm"
-            />
-          )}
-          <div className="flex flex-col min-w-0">
-            <span className="truncate text-xs font-semibold text-white">{nowPlaying?.title}</span>
-            <span className="truncate text-[11px] text-white/60">{nowPlaying?.artist}</span>
+      <div className="pointer-events-auto fixed inset-x-2.5 bottom-[calc(58px+max(8px,env(safe-area-inset-bottom)))] z-[calc(var(--z-web-chrome)-1)] hidden max-sm:flex flex-col rounded-2xl border border-white/10 bg-[#161426]/95 shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-2">
+          <div
+            className="flex flex-1 min-w-0 items-center gap-2.5 cursor-pointer pr-2"
+            onClick={() => setFullScreen(true)}
+          >
+            {nowPlaying?.artworkUrl && (
+              <img
+                src={nowPlaying.artworkUrl}
+                alt=""
+                className="size-10 rounded-lg object-cover flex-none shadow-sm"
+              />
+            )}
+            <div className="flex flex-col min-w-0">
+              <span className="truncate text-xs font-semibold text-white">{nowPlaying?.title}</span>
+              <span className="truncate text-[11px] text-white/60">
+                {nowPlaying?.artist || (playing ? 'Playing' : 'Paused')}
+              </span>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-1.5 flex-none">
-          {isBestPartVisible && (
+          <div className="flex items-center gap-1.5 flex-none">
+            {isBestPartVisible && (
+              <button
+                type="button"
+                className="flex h-7 items-center pl-2.5 pr-3 gap-1.5 rounded-full shadow-sm transition-all hover:brightness-110 active:scale-95 select-none"
+                style={{
+                  background:
+                    'linear-gradient(rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.17)) padding-box, linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.20) 100%) border-box',
+                  border: '1px solid transparent',
+                  borderRadius: '9999px',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                }}
+                onClick={() => void jumpToBestPart()}
+                aria-label="Best Part"
+              >
+                <BestPartMusicIcon className="w-3.5 h-3 text-white flex-none" />
+                <span className="text-[11px] font-semibold text-white leading-none select-none">
+                  Best Part
+                </span>
+              </button>
+            )}
             <button
               type="button"
-              className="flex h-7 items-center pl-2.5 pr-3 gap-1.5 rounded-full shadow-sm transition-all hover:brightness-110 active:scale-95 select-none"
-              style={{
-                background:
-                  'linear-gradient(rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.17)) padding-box, linear-gradient(180deg, rgba(255, 255, 255, 0.52) 0%, rgba(255, 255, 255, 0.20) 100%) border-box',
-                border: '1px solid transparent',
-                borderRadius: '9999px',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-              }}
-              onClick={() => void jumpToBestPart()}
-              aria-label="Best Part"
+              className="grid size-8 place-items-center rounded-full text-white hover:bg-white/10 active:scale-95"
+              onClick={togglePlay}
+              aria-label={playing ? 'Pause' : 'Play'}
             >
-              <BestPartMusicIcon className="w-3.5 h-3 text-white flex-none" />
-              <span className="text-[11px] font-semibold text-white leading-none select-none">
-                Best Part
-              </span>
+              {playing ? <PauseIcon size={20} /> : <PlayIcon size={20} />}
             </button>
-          )}
-          <button
-            type="button"
-            className="grid size-8 place-items-center rounded-full text-white hover:bg-white/10 active:scale-95"
-            onClick={togglePlay}
-            aria-label={playing ? 'Pause' : 'Play'}
-          >
-            {playing ? <PauseIcon size={20} /> : <PlayIcon size={20} />}
-          </button>
+            <button
+              type="button"
+              className="grid size-8 place-items-center rounded-full text-white/70 hover:text-white hover:bg-white/10 active:scale-95"
+              disabled={!hasNext}
+              onClick={next}
+              aria-label="Next track"
+            >
+              <ForwardIcon size={18} />
+            </button>
+          </div>
+        </div>
+        {/* Subtle mobile progress indicator */}
+        <div className="h-[2px] w-full bg-white/10">
+          <div
+            className="h-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-[width] duration-300"
+            style={{
+              width: `${Math.min(100, Math.max(0, (currentTime / ((track?.durationSec ?? 0) || 1)) * 100))}%`,
+            }}
+          />
         </div>
       </div>
     )}

@@ -166,7 +166,9 @@ export function Lcd() {
           <span className={titleClass}>{status === 'loading' ? 'Loading…' : ''}</span>
         )}
         {status === 'error' ? (
-          <span className="truncate type-callout-medium text-key">{error}</span>
+          <span className="truncate type-callout-medium text-key">
+            {error && /bot/i.test(error) ? 'Connecting audio stream…' : error}
+          </span>
         ) : (
           <span className="truncate type-callout-medium text-secondary">
             {artist ? <Credits videoId={videoId} line={artist} artists={track?.artists ?? []} /> : status === 'loading' ? 'Loading…' : ''}

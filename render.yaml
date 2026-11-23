@@ -1,5 +1,5 @@
 services:
-  # 1. Aroma Listen Together Go WebSocket Party Server
+  # 1. Aroma Listen Together Go WebSocket Party Server & Stream Resolver
   - type: web
     name: aroma-party-server
     runtime: docker
@@ -7,6 +7,7 @@ services:
     dockerContext: ./backend
     plan: free
     region: oregon
+    autoDeploy: true
     envVars:
       - key: PORT
         value: 9000
@@ -14,12 +15,15 @@ services:
         value: "true"
       - key: JAM_ALLOWED_ORIGINS
         value: "*"
+      - key: GOOGLE_CLIENT_ID
+        value: 534490679821-f2l3d1qp5sdv1bvhrq6b7jf0du1n2319.apps.googleusercontent.com
 
   # 2. Aroma Web Music Player Frontend
   - type: web
     name: aroma-web-player
     runtime: static
     rootDir: web
+    autoDeploy: true
     buildCommand: corepack enable && pnpm install --frozen-lockfile=false && pnpm --filter @bitchord/extension package && pnpm --filter @aroma/app build
     staticPublishPath: ./app/dist
     routes:
@@ -31,3 +35,5 @@ services:
         value: 22
       - key: VITE_PARTY_SERVER_URL
         value: https://aroma-party-server.onrender.com
+      - key: VITE_GOOGLE_CLIENT_ID
+        value: 534490679821-f2l3d1qp5sdv1bvhrq6b7jf0du1n2319.apps.googleusercontent.com

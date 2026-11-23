@@ -5,26 +5,20 @@ import { useDiscordPresence } from '@/playback/discordPresence';
 import { startHistoryReporting } from '@/playback/historyReporting';
 import { startLivePresence } from '@/playback/livePresence';
 import { Outlet } from 'react-router';
-import { PrefetchLink } from '@/components/PrefetchLink';
-import { config } from '@/config';
-import { useExtension } from '@/extension/useExtension';
-import { isMobileBrowser } from '@/lib/platform';
 import { useUi } from '@/state/ui';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
-import { Banner, bannerButtonClass } from './Banner';
+import { MobileNavBar } from './MobileNavBar';
 import { MobileTopBar } from './MobileTopBar';
 import { PlayerBar } from './PlayerBar';
 import { SidePanel } from './SidePanel';
 import { Sidebar } from './Sidebar';
-
-const mobile = isMobileBrowser();
 
 // It carries am-lyrics; loaded the first time it opens, as the side panel's lyrics are.
 const FullScreenPlayer = lazy(() => import('./FullScreenPlayer').then((m) => ({ default: m.FullScreenPlayer })));
 
 /**
  * The app frame (report §1): glass sidebar, the scrolling page, the floating
- * player pill, the side panel, and the bottom band when there is one.
+ * player pill, the side panel, and mobile top/bottom navigation.
  */
 export function AppShell() {
   useKeyboardShortcuts();
@@ -38,25 +32,7 @@ export function AppShell() {
   useEffect(() => startHistoryReporting(), []);
   // Counts this tab in the "listening now" figure beside the phone and PC apps.
   useEffect(() => startLivePresence(), []);
-  const extension = useExtension();
-  const bannerDismissed = useUi((s) => s.installBannerDismissed);
-  const dismissBanner = useUi((s) => s.dismissInstallBanner);
   const fullScreen = useUi((s) => s.fullScreen);
-
-  let banner = null;
-  if (mobile) {
-    banner = (
-      <Banner
-        title="AROMA is better in the app."
-        detail="Phone browsers can’t run the AROMA extension. The Android app has everything."
-        action={
-          <a className={bannerButtonClass} href={config.androidAppUrl} target="_blank" rel="noreferrer">
-            Get the App
-          </a>
-        }
-      />
-    );
-  }
 
   return (
     <div className="grid h-full grid-rows-[minmax(0,1fr)_auto]">
@@ -69,15 +45,15 @@ export function AppShell() {
           id="scrollable-page"
           className="absolute inset-0 overflow-x-hidden overflow-y-auto pl-(--web-navigation-width) [scrollbar-gutter:stable] data-tint:bg-(--page-tint) data-tint:transition-[background-color] data-tint:duration-300 data-tint:ease-in max-sm:pt-(--mobile-top-bar-height) max-sm:pl-0"
         >
-          {/* Clears the floating pill: its height, its offset, and some air. */}
-          <div className="min-h-full pb-[calc(var(--player-pill-height)+var(--player-bottom-offset)+40px)]">
+          {/* Clears the floating pill: its height, its offset, and bottom navigation bar on mobile */}
+          <div className="min-h-full pb-[calc(var(--player-pill-height)+var(--player-bottom-offset)+40px)] max-sm:pb-40">
             <Outlet />
           </div>
         </main>
         <PlayerBar />
         <SidePanel />
+        <MobileNavBar />
       </div>
-      {banner}
       {fullScreen && (
         <Suspense fallback={null}>
           <FullScreenPlayer />

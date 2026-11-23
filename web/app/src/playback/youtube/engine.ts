@@ -227,6 +227,10 @@ export class YouTubeEngine {
       if (!(error instanceof SupersededError)) {
         trackLog.e(`load failed: ${describe(error)}`, videoId);
       }
+      const rawMsg = error instanceof Error ? error.message : String(error);
+      if (/bot/i.test(rawMsg)) {
+        throw new Error('Audio stream temporarily unavailable. Tap to retry.');
+      }
       throw error;
     } finally {
       if (generation === this.generation) this.loading = false;
@@ -389,8 +393,14 @@ export class YouTubeEngine {
     // BotGuard clients attach the streaming token to every media URL, as
     // InnerTubeX does on Android (`pot`, bound to the videoId).
     const pot = usesWebPo(client) ? await botguard.mint(videoId) : undefined;
+    const hasAudioOnly = (info.streaming_data?.adaptive_formats ?? []).some((f) => f.has_audio && !f.has_video);
     return info.toDash({
-      format_filter: (format) => format.has_video || !format.has_audio,
+      format_filter: (format) => {
+        if (hasAudioOnly) {
+          return format.has_video || !format.has_audio;
+        }
+        return !format.has_audio;
+      },
       url_transformer: (url) => {
         if (pot) url.searchParams.set('pot', pot);
         return url;
