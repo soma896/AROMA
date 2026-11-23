@@ -395,18 +395,18 @@ object BitChordIcons {
             path(fill = stroke) {
                 // Left note head (tilted ellipse)
                 moveTo(4.5f, 16.5f)
-                cubicTo(4.2f, 14.8f, 6.2f, 13.5f, 8.8f, 13.7f)
-                cubicTo(11.4f, 13.9f, 13.2f, 15.5f, 12.8f, 17.2f)
-                cubicTo(12.4f, 18.9f, 10.4f, 20.2f, 7.8f, 20.0f)
-                cubicTo(5.2f, 19.8f, 4.8f, 18.2f, 4.5f, 16.5f)
+                curveTo(4.2f, 14.8f, 6.2f, 13.5f, 8.8f, 13.7f)
+                curveTo(11.4f, 13.9f, 13.2f, 15.5f, 12.8f, 17.2f)
+                curveTo(12.4f, 18.9f, 10.4f, 20.2f, 7.8f, 20.0f)
+                curveTo(5.2f, 19.8f, 4.8f, 18.2f, 4.5f, 16.5f)
                 close()
 
                 // Right note head (tilted ellipse, higher up)
                 moveTo(13.0f, 14.5f)
-                cubicTo(12.7f, 12.8f, 14.7f, 11.5f, 17.3f, 11.7f)
-                cubicTo(19.9f, 11.9f, 21.7f, 13.5f, 21.3f, 15.2f)
-                cubicTo(20.9f, 16.9f, 18.9f, 18.2f, 16.3f, 18.0f)
-                cubicTo(13.7f, 17.8f, 13.3f, 16.2f, 13.0f, 14.5f)
+                curveTo(12.7f, 12.8f, 14.7f, 11.5f, 17.3f, 11.7f)
+                curveTo(19.9f, 11.9f, 21.7f, 13.5f, 21.3f, 15.2f)
+                curveTo(20.9f, 16.9f, 18.9f, 18.2f, 16.3f, 18.0f)
+                curveTo(13.7f, 17.8f, 13.3f, 16.2f, 13.0f, 14.5f)
                 close()
 
                 // Left stem
