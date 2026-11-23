@@ -1,7 +1,7 @@
-import { AlertCircle, CheckCircle2, Loader2, ShieldCheck, X } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, Loader2, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AromaLogo } from '@/components/icons/AromaLogo';
-import { config } from '@/config';
+import { config, isGoogleAuthConfigured } from '@/config';
 import { useAuth } from './useAuth';
 
 export function GoogleLogo({ size = 18 }: { size?: number }) {
@@ -36,11 +36,16 @@ export function GoogleSignInModal() {
   const [error, setError] = useState<string | null>(null);
   const [gisLoaded, setGisLoaded] = useState(false);
   const buttonContainerRef = useRef<HTMLDivElement>(null);
+  const isConfigured = isGoogleAuthConfigured();
 
-  // Initialize Official Google Identity Services SDK
+  // Initialize Official Google Identity Services SDK only when a valid Client ID is configured
   useEffect(() => {
     if (!isOpen) {
       setError(null);
+      return;
+    }
+
+    if (!isConfigured) {
       return;
     }
 
@@ -115,12 +120,16 @@ export function GoogleSignInModal() {
       isMounted = false;
       if (timer) clearTimeout(timer);
     };
-  }, [isOpen, close, loginWithGoogleToken]);
+  }, [isOpen, isConfigured, close, loginWithGoogleToken]);
 
   if (!isOpen) return null;
 
   const handleManualTrigger = () => {
     setError(null);
+    if (!isConfigured) {
+      setError('Google Sign-In is not configured. Please set VITE_GOOGLE_CLIENT_ID first.');
+      return;
+    }
     if (window.google?.accounts?.id) {
       window.google.accounts.id.prompt();
     } else {
@@ -166,35 +175,55 @@ export function GoogleSignInModal() {
           </div>
         )}
 
-        {/* Official Google Identity Services Container */}
-        <div className="flex flex-col items-center justify-center min-h-[50px] my-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-3 text-sm text-white/70">
-              <Loader2 size={20} className="animate-spin text-[#9d50bb]" />
-              <span>Verifying Google account...</span>
+        {/* Configuration Setup State: Shown when VITE_GOOGLE_CLIENT_ID is not yet configured */}
+        {!isConfigured ? (
+          <div className="my-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left">
+            <div className="flex items-center gap-2 font-semibold text-xs text-amber-300 mb-1.5">
+              <AlertTriangle size={16} className="text-amber-400 flex-shrink-0" />
+              <span>Google Sign-In Configuration Required</span>
             </div>
-          ) : (
-            <div className="w-full flex flex-col items-center">
-              {/* Google's official rendered button */}
-              <div
-                ref={buttonContainerRef}
-                className="w-full flex justify-center min-h-[44px]"
-              />
+            <p className="text-[11px] text-amber-200/80 leading-relaxed mb-3">
+              To prevent authorization errors (<code className="text-amber-300">401: invalid_client</code>), provide your official Google OAuth 2.0 Web Client ID from Google Cloud Console.
+            </p>
+            <div className="rounded-lg bg-black/40 border border-white/10 p-2.5 text-[11px] font-mono text-white/80">
+              <div className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Configuration Key</div>
+              <div className="select-all text-amber-300">VITE_GOOGLE_CLIENT_ID=&lt;client-id&gt;.apps.googleusercontent.com</div>
+            </div>
+            <p className="mt-2 text-[10px] text-white/50 leading-relaxed">
+              Add this to <code className="text-white/70">web/app/.env.local</code> (or your Render Web Service environment variables).
+            </p>
+          </div>
+        ) : (
+          /* Official Google Identity Services Container */
+          <div className="flex flex-col items-center justify-center min-h-[50px] my-2">
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-2 py-3 text-sm text-white/70">
+                <Loader2 size={20} className="animate-spin text-[#9d50bb]" />
+                <span>Verifying Google account...</span>
+              </div>
+            ) : (
+              <div className="w-full flex flex-col items-center">
+                {/* Google's official rendered button */}
+                <div
+                  ref={buttonContainerRef}
+                  className="w-full flex justify-center min-h-[44px]"
+                />
 
-              {/* Fallback button if GIS script is delayed or blocked */}
-              {!gisLoaded && (
-                <button
-                  type="button"
-                  onClick={handleManualTrigger}
-                  className="flex w-full max-w-[320px] items-center justify-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 font-medium text-white shadow hover:bg-white/15 transition-all cursor-pointer"
-                >
-                  <GoogleLogo size={18} />
-                  <span>Continue with Google</span>
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+                {/* Fallback button if GIS script is delayed or blocked */}
+                {!gisLoaded && (
+                  <button
+                    type="button"
+                    onClick={handleManualTrigger}
+                    className="flex w-full max-w-[320px] items-center justify-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 font-medium text-white shadow hover:bg-white/15 transition-all cursor-pointer"
+                  >
+                    <GoogleLogo size={18} />
+                    <span>Continue with Google</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Security & Verification Guarantees */}
         <div className="mt-6 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-left">

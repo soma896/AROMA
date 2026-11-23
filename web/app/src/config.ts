@@ -11,7 +11,16 @@ export const config = {
   /** BitChord's Listen Together server. vite.config.ts refuses a production build without it. */
   partyServerUrl: import.meta.env.VITE_PARTY_SERVER_URL || 'https://aroma-party-server.onrender.com',
   /** Official Google OAuth Client ID for Aroma Google Identity Services. */
-  googleClientId:
-    import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-    '1035659837584-aroma-music-player.apps.googleusercontent.com',
+  googleClientId: (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim(),
 } as const;
+
+/** Checks if a real, valid Google OAuth 2.0 Web Client ID is configured. */
+export function isGoogleAuthConfigured(): boolean {
+  const cid = config.googleClientId;
+  return (
+    !!cid &&
+    cid.endsWith('.apps.googleusercontent.com') &&
+    !cid.includes('placeholder') &&
+    !cid.includes('aroma-music-player')
+  );
+}

@@ -104,7 +104,7 @@ var (
 	TrustProxy           = getBool("JAM_TRUST_PROXY", false)
 	PublicOrigin         = getOrigin("JAM_PUBLIC_ORIGIN")
 	Port                 = getInt("PORT", 9000)
-	GoogleClientID       = getString("GOOGLE_CLIENT_ID", "1035659837584-aroma-music-player.apps.googleusercontent.com")
+	GoogleClientID       = getString("GOOGLE_CLIENT_ID", "")
 )
 
 // Open-app heartbeats. The interval is handed back on every ping, so it can be
