@@ -236,6 +236,7 @@ describe('Best Part Player Interaction & Seeking', () => {
       status: 'playing',
     });
 
+    await verifyBestPart('song_clean_jump', 50, 80, 'manual');
     await useBestPart.getState().loadForSong('song_clean_jump', 200);
     const jumped = await useBestPart.getState().jumpToBestPart();
     expect(jumped).toBe(true);

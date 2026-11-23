@@ -13,14 +13,14 @@ import { botguard } from './botguard';
  * "The page needs to be reloaded" and WEB_EMBEDDED "This video is unavailable",
  * so those two are left out. googlevideo's own SABR example uses VISIONOS.
  */
-export const CLIENT_ORDER = ['VISIONOS', 'YTMUSIC', 'WEB', 'MWEB'] as const;
+export const CLIENT_ORDER = ['VISIONOS', 'ANDROID', 'IOS', 'YTMUSIC', 'WEB', 'MWEB'] as const;
 export type PlayerClientName = (typeof CLIENT_ORDER)[number];
 
 /**
  * The BotGuard (WebPO) clients. As on Android (PoTokenGenerator /
  * InnerTubeX's WEB_BOTGUARD provider), they get two tokens: one bound to the
  * session's visitor data for the player request, and one bound to the
- * videoId for the stream. VISIONOS is not one of them.
+ * videoId for the stream. VISIONOS, ANDROID and IOS are not among them.
  */
 const WEBPO_CLIENTS: ReadonlySet<PlayerClientName> = new Set(['YTMUSIC', 'WEB', 'MWEB']);
 
@@ -37,7 +37,7 @@ async function playerRequestToken(yt: Innertube, client: PlayerClientName): Prom
 }
 
 /** StreamResolver: how many clients are worth trying for one track. */
-export const CLIENT_ATTEMPTS = 3;
+export const CLIENT_ATTEMPTS = 5;
 /** InnerTubeXResolver.EXCLUDE_MS: a client that refused a track sits out for this long. */
 const EXCLUDE_MS = 10 * 60_000;
 /** StreamResolver.UNPLAYABLE_TTL_MS: a settled "no" isn't asked again for this long. */
@@ -131,7 +131,7 @@ function clientOrder(): readonly PlayerClientName[] {
  * way (WEB_REMIX with cookies, InnerTubeX). VISIONOS follows in case the
  * session is honoured there too.
  */
-const SIGNED_ORDER: readonly PlayerClientName[] = ['YTMUSIC', 'WEB', 'VISIONOS'];
+const SIGNED_ORDER: readonly PlayerClientName[] = ['YTMUSIC', 'WEB', 'VISIONOS', 'ANDROID', 'IOS'];
 
 export function clientsFor(videoId: string, signed = false): PlayerClientName[] {
   const entries = excluded.get(keyOf(videoId, signed));
@@ -234,7 +234,10 @@ export async function resolvePlayer(
       const status = info.playability_status?.status;
       const ms = Math.round(performance.now() - started);
       const streaming = info.streaming_data;
-      const playable = !!streaming?.server_abr_streaming_url || !!streaming?.adaptive_formats.some((f) => f.has_audio && !f.has_video);
+      const playable =
+        !!streaming?.server_abr_streaming_url ||
+        !!streaming?.adaptive_formats.some((f) => f.has_audio && !f.has_video) ||
+        !!streaming?.formats?.some((f) => f.has_audio);
       if (status === 'OK' && playable) {
         trackLog.d(`${client}${signed ? ' (signed in)' : ''} answered OK in ${ms}ms`, videoId);
         return { videoId, client, info, yt, signed };

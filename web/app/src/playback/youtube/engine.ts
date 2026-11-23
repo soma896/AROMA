@@ -258,12 +258,27 @@ export class YouTubeEngine {
     this.checkCurrent(generation);
     if (this.player) {
       await this.player.unload().catch(() => {});
+      await this.player.detach().catch(() => {});
     }
     this.adapter?.dispose();
     this.adapter = null;
 
     this.audio.src = streamUrl;
-    this.audio.currentTime = startSec;
+    if (startSec > 0) {
+      const setTime = () => {
+        try {
+          this.audio.currentTime = startSec;
+        } catch {
+          // Ignore
+        }
+      };
+      if (this.audio.readyState >= 1) {
+        setTime();
+      } else {
+        this.audio.addEventListener('loadedmetadata', setTime, { once: true });
+      }
+    }
+
     if (autoplay) {
       await this.audio.play().catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'NotAllowedError') {
@@ -279,15 +294,18 @@ export class YouTubeEngine {
       title: data.title || '',
       author: data.author || '',
       durationSec: data.durationSec || 0,
-      thumbnails: [],
-      client: 'VISIONOS',
-      format: `${best.itag || 140} direct fallback`,
+      thumbnails: [
+        { url: `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`, width: 1280, height: 720 },
+        { url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`, width: 480, height: 360 },
+      ],
+      client: (data.source?.toUpperCase() as PlayerClientName) || 'VISIONOS',
+      format: `${best.itag || 18} direct stream`,
       stream: {
         codec: best.mimeType?.includes('opus') ? 'Opus' : 'AAC',
-        itag: String(best.itag || 140),
+        itag: String(best.itag || 18),
         bitrateKbps: Math.round((best.bitrate || 128000) / 1000),
         sampleRateHz: 44100,
-        channels: 2,
+        channels: best.audioChannels || 2,
         mode: 'direct',
       },
       loudnessDb: null,
@@ -302,6 +320,9 @@ export class YouTubeEngine {
     generation: number,
   ): Promise<LoadedTrack> {
     const { videoId, client, info, signed } = resolved;
+    if (!player.getMediaElement()) {
+      await player.attach(this.audio).catch(() => {});
+    }
     await player.unload();
     this.adapter?.dispose();
     this.adapter = null;
@@ -565,7 +586,10 @@ function codecName(codec: string | null): string | null {
 
 /** Whether the response carries audio URLs to fetch directly (VISIONOS does; the web clients only offer SABR). */
 function hasDirectAudio(info: YT.VideoInfo): boolean {
-  return !!info.streaming_data?.adaptive_formats.some((f) => f.has_audio && !f.has_video && (f.url || f.signature_cipher || f.cipher));
+  return (
+    !!info.streaming_data?.adaptive_formats.some((f) => f.has_audio && !f.has_video && (f.url || f.signature_cipher || f.cipher)) ||
+    !!info.streaming_data?.formats?.some((f) => f.has_audio && (f.url || f.signature_cipher || f.cipher))
+  );
 }
 
 /** googlevideo saying no to this client, as opposed to pacing or a network blip. */

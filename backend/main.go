@@ -289,7 +289,9 @@ func createYTProxy(originHost, prefix string) http.HandlerFunc {
 			}
 			req.Header.Set("Origin", originHost)
 			req.Header.Set("Referer", originHost+"/")
-			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+			if req.Header.Get("User-Agent") == "" {
+				req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+			}
 			req.Header.Del("Cookie")
 		},
 		ModifyResponse: func(resp *http.Response) error {
@@ -345,7 +347,9 @@ func handleGoogleVideoProxy(w http.ResponseWriter, r *http.Request) {
 			req.Header.Del("Origin")
 			req.Header.Del("Referer")
 			req.Header.Del("Cookie")
-			req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+			if req.Header.Get("User-Agent") == "" {
+				req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+			}
 		},
 		ModifyResponse: func(resp *http.Response) error {
 			resp.Header.Del("Access-Control-Allow-Origin")

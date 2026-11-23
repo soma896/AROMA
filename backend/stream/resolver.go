@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -69,6 +70,7 @@ type innertubePlayerResponse struct {
 		LengthSeconds string `json:"lengthSeconds"`
 	} `json:"videoDetails"`
 	StreamingData struct {
+		Formats         []innertubeAdaptiveFormat `json:"formats"`
 		AdaptiveFormats []innertubeAdaptiveFormat `json:"adaptiveFormats"`
 	} `json:"streamingData"`
 }
@@ -80,57 +82,117 @@ func (r *Resolver) Resolve(videoID string) (*StreamResult, error) {
 	}
 
 	// 1. Try Android client context
-	res, err := r.resolveWithClient(videoID, "ANDROID", "19.34.42", "com.google.android.youtube/19.34.42 (Linux; U; Android 13) gzip")
+	res, err := r.resolveAndroid(videoID)
 	if err == nil && len(res.Formats) > 0 {
 		res.Source = "android"
 		return res, nil
 	}
 
-	// 2. Try iOS client context
-	res, err = r.resolveWithClient(videoID, "IOS", "19.34.2", "com.google.ios.youtube/19.34.2 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)")
+	// 2. Try VisionOS client context
+	res, err = r.resolveVisionOS(videoID)
 	if err == nil && len(res.Formats) > 0 {
-		res.Source = "ios"
+		res.Source = "visionos"
 		return res, nil
 	}
 
-	// 3. Try Invidious / Piped fallback instances
-	res, err = r.resolveFallback(videoID)
+	// 3. Try iOS client context
+	res, err = r.resolveIOS(videoID)
 	if err == nil && len(res.Formats) > 0 {
-		res.Source = "fallback"
+		res.Source = "ios"
 		return res, nil
 	}
 
 	return nil, fmt.Errorf("unable to resolve stream for %s: %w", videoID, err)
 }
 
-func (r *Resolver) resolveWithClient(videoID, clientName, clientVersion, userAgent string) (*StreamResult, error) {
+func (r *Resolver) resolveAndroid(videoID string) (*StreamResult, error) {
+	ua := "com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip"
 	payload := map[string]any{
 		"context": map[string]any{
 			"client": map[string]any{
-				"clientName":        clientName,
-				"clientVersion":     clientVersion,
-				"androidSdkVersion": 33,
+				"clientName":        "ANDROID",
+				"clientVersion":     "21.03.36",
+				"androidSdkVersion": 36,
 				"osName":            "Android",
 				"osVersion":         "13",
 				"platform":          "MOBILE",
-				"userAgent":         userAgent,
+				"clientFormFactor":  "SMALL_FORM_FACTOR",
+				"userAgent":         ua,
 				"hl":                "en",
-				"gl":                "US",
+				"gl":                "IN",
+			},
+			"user": map[string]any{
+				"enableSafetyMode": false,
+				"lockedSafetyMode": false,
+			},
+			"request": map[string]any{
+				"useSsl":                  true,
+				"internalExperimentFlags": []any{},
 			},
 		},
-		"videoId":          videoID,
-		"contentCheckOk":   true,
-		"racyCheckOk":      true,
+		"videoId":        videoID,
+		"contentCheckOk": true,
+		"racyCheckOk":    true,
 	}
+	return r.executePlayerCall(videoID, payload, ua)
+}
 
+func (r *Resolver) resolveVisionOS(videoID string) (*StreamResult, error) {
+	ua := "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
+	payload := map[string]any{
+		"context": map[string]any{
+			"client": map[string]any{
+				"clientName":    "VISIONOS",
+				"clientVersion": "1.02",
+				"osName":        "visionOS",
+				"osVersion":     "26.5.23O471",
+				"platform":      "MOBILE",
+				"deviceMake":    "Apple",
+				"deviceModel":   "RealityDevice17,1",
+				"userAgent":     ua,
+				"hl":            "en",
+				"gl":            "US",
+			},
+		},
+		"videoId":        videoID,
+		"contentCheckOk": true,
+		"racyCheckOk":    true,
+	}
+	return r.executePlayerCall(videoID, payload, ua)
+}
+
+func (r *Resolver) resolveIOS(videoID string) (*StreamResult, error) {
+	ua := "com.google.ios.youtube/19.34.2 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)"
+	payload := map[string]any{
+		"context": map[string]any{
+			"client": map[string]any{
+				"clientName":    "IOS",
+				"clientVersion": "19.34.2",
+				"deviceMake":    "Apple",
+				"deviceModel":   "iPhone16,2",
+				"osName":        "iOS",
+				"osVersion":     "17.5.1.21F90",
+				"platform":      "MOBILE",
+				"userAgent":     ua,
+				"hl":            "en",
+				"gl":            "US",
+			},
+		},
+		"videoId":        videoID,
+		"contentCheckOk": true,
+		"racyCheckOk":    true,
+	}
+	return r.executePlayerCall(videoID, payload, ua)
+}
+
+func (r *Resolver) executePlayerCall(videoID string, payload map[string]any, userAgent string) (*StreamResult, error) {
 	reqBody, _ := json.Marshal(payload)
-	req, err := http.NewRequest("POST", "https://www.youtube.com/youtubei/v1/player?prettyPrint=false", bytes.NewReader(reqBody))
+	req, err := http.NewRequest("POST", "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false&alt=json", bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Origin", "https://www.youtube.com")
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
@@ -175,86 +237,49 @@ func (r *Resolver) resolveWithClient(videoID, clientName, clientVersion, userAge
 	}
 
 	if len(formats) == 0 {
-		return nil, errors.New("no audio formats with direct URLs found")
-	}
-
-	return &StreamResult{
-		VideoID:   videoID,
-		Title:     parsed.VideoDetails.Title,
-		Author:    parsed.VideoDetails.Author,
-		Formats:   formats,
-		BestAudio: bestAudio,
-	}, nil
-}
-
-func (r *Resolver) resolveFallback(videoID string) (*StreamResult, error) {
-	// Try public invidious stream endpoints
-	instances := []string{
-		"https://inv.tux.pizza/api/v1/videos/",
-		"https://invidious.nerdvpn.de/api/v1/videos/",
-	}
-
-	for _, inst := range instances {
-		url := inst + videoID
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("User-Agent", "Aroma/2.0")
-		resp, err := r.httpClient.Do(req)
-		if err != nil {
-			continue
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			continue
-		}
-
-		var payload struct {
-			Title           string `json:"title"`
-			Author          string `json:"author"`
-			LengthSeconds   int    `json:"lengthSeconds"`
-			AdaptiveFormats []struct {
-				Itag     string `json:"itag"`
-				URL      string `json:"url"`
-				Type     string `json:"type"`
-				Bitrate  string `json:"bitrate"`
-				Encoding string `json:"encoding"`
-			} `json:"adaptiveFormats"`
-		}
-
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			continue
-		}
-
-		formats := make([]AudioFormat, 0)
-		var bestAudio *AudioFormat
-		for _, af := range payload.AdaptiveFormats {
-			if strings.HasPrefix(af.Type, "audio/") && af.URL != "" {
+		for _, f := range parsed.StreamingData.Formats {
+			if f.URL != "" && (strings.HasPrefix(f.MimeType, "audio/") || strings.Contains(f.MimeType, "mp4a") || f.AudioChannels > 0) {
 				fmtItem := AudioFormat{
-					MimeType: af.Type,
-					URL:      af.URL,
+					Itag:          f.Itag,
+					MimeType:      f.MimeType,
+					Bitrate:       f.Bitrate,
+					SampleRate:    f.AudioSampleRate,
+					AudioChannels: f.AudioChannels,
+					URL:           f.URL,
+					ContentLength: f.ContentLength,
 				}
 				formats = append(formats, fmtItem)
-				if bestAudio == nil {
+				if bestAudio == nil || fmtItem.Bitrate > bestAudio.Bitrate {
 					bestCopy := fmtItem
 					bestAudio = &bestCopy
 				}
 			}
 		}
+	}
 
-		if len(formats) > 0 {
-			return &StreamResult{
-				VideoID:     videoID,
-				Title:       payload.Title,
-				Author:      payload.Author,
-				DurationSec: payload.LengthSeconds,
-				Formats:     formats,
-				BestAudio:   bestAudio,
-			}, nil
+	if len(formats) == 0 {
+		return nil, errors.New("no audio formats with direct URLs found")
+	}
+
+	durSec, _ := strconv.Atoi(parsed.VideoDetails.LengthSeconds)
+	if durSec == 0 && bestAudio != nil {
+		for _, f := range parsed.StreamingData.Formats {
+			if f.ApproxDurationMs != "" {
+				if ms, err := strconv.ParseInt(f.ApproxDurationMs, 10, 64); err == nil && ms > 0 {
+					durSec = int(ms / 1000)
+					break
+				}
+			}
 		}
 	}
 
-	return nil, errors.New("fallback instances unreachable")
+	return &StreamResult{
+		VideoID:     videoID,
+		Title:       parsed.VideoDetails.Title,
+		Author:      parsed.VideoDetails.Author,
+		DurationSec: durSec,
+		Formats:     formats,
+		BestAudio:   bestAudio,
+	}, nil
 }
+
