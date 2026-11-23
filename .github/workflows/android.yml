@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-prod-release:
+  build-android-apk:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,37 +20,53 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Setup Secrets (Keystore & local.properties)
+    - name: Setup Configuration & Keystore
       run: |
         echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" > local.properties
         echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> local.properties
-        echo "LISTEN_TOGETHER_SERVER=${{ secrets.LISTEN_TOGETHER_SERVER }}" >> local.properties
+        echo "LISTEN_TOGETHER_SERVER=${{ secrets.LISTEN_TOGETHER_SERVER || 'https://aroma-party-server.onrender.com' }}" >> local.properties
 
-        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > bitchord-release.jks
-        {
-          echo "storeFile=bitchord-release.jks"
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}"
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
-        } > keystore.properties
+        if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+          echo "Decoding release keystore..."
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > aroma-release.jks
+          {
+            echo "storeFile=aroma-release.jks"
+            echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}"
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+          } > keystore.properties
+          echo "HAS_KEYSTORE=true" >> $GITHUB_ENV
+        else
+          echo "No release keystore found, will build debuggable prod APK"
+          echo "HAS_KEYSTORE=false" >> $GITHUB_ENV
+        fi
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
-    - name: Build Signed Prod Release APK
-      run: ./gradlew assembleProdRelease
+    - name: Build Android APK
+      run: |
+        if [ "$HAS_KEYSTORE" = "true" ]; then
+          ./gradlew assembleProdRelease
+        else
+          ./gradlew assembleProdDebug
+        fi
+
+    - name: Find and Prepare APK for Artifact
+      run: |
+        mkdir -p release-apk
+        find app/build/outputs/apk/ -name "*.apk" -exec cp {} release-apk/Aroma-Music.apk \;
+        ls -la release-apk/
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: bitchord-prod-release-signed
-        path: app/build/outputs/apk/prod/release/*.apk
+        name: Aroma-Music-Android-APK
+        path: release-apk/Aroma-Music.apk
 
-    # Built by the same assembleProdRelease, with the same key. The watch app
-    # only pairs with a phone app signed by the same key, so a prod watch APK
-    # for these phone builds can only come from here, never a local build.
     - name: Upload Wear OS APK Artifact
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: bitchord-wear-prod-release-signed
-        path: wearos/build/outputs/apk/prod/release/*.apk
+        name: Aroma-Wear-OS-APK
+        path: wearos/build/outputs/apk/**/*.apk
