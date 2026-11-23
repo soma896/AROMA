@@ -146,7 +146,7 @@ android {
         create("prod") {
             dimension = "env"
             applicationId = "com.aroma.music"
-            // Matches defaultConfig — this is the package already shipped/installed.
+            resValue("string", "app_name", "AROMA")
         }
     }
 
