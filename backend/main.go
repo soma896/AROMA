@@ -258,6 +258,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"service":    "aroma-listen-together",
+		"version":    "v1.1-stream-diag",
 		"members":    store.MemberCount(),
 		"parties":    store.Len(),
 		"serverMs":   clock.NowMs(),

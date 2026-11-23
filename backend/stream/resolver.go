@@ -81,31 +81,42 @@ func (r *Resolver) Resolve(videoID string) (*StreamResult, error) {
 		return nil, errors.New("empty videoId")
 	}
 
-	// 1. Try Android client context
-	res, err := r.resolveAndroid(videoID)
+	var errorsList []string
+
+	// 1. Try Android client context (IN)
+	res, err := r.resolveAndroid(videoID, "IN")
 	if err == nil && len(res.Formats) > 0 {
-		res.Source = "android"
+		res.Source = "android-in"
 		return res, nil
 	}
+	if err != nil {
+		errorsList = append(errorsList, fmt.Sprintf("android-in: %v", err))
+	}
 
-	// 2. Try VisionOS client context
+	// 2. Try Android client context (US)
+	res, err = r.resolveAndroid(videoID, "US")
+	if err == nil && len(res.Formats) > 0 {
+		res.Source = "android-us"
+		return res, nil
+	}
+	if err != nil {
+		errorsList = append(errorsList, fmt.Sprintf("android-us: %v", err))
+	}
+
+	// 3. Try VisionOS client context
 	res, err = r.resolveVisionOS(videoID)
 	if err == nil && len(res.Formats) > 0 {
 		res.Source = "visionos"
 		return res, nil
 	}
-
-	// 3. Try iOS client context
-	res, err = r.resolveIOS(videoID)
-	if err == nil && len(res.Formats) > 0 {
-		res.Source = "ios"
-		return res, nil
+	if err != nil {
+		errorsList = append(errorsList, fmt.Sprintf("visionos: %v", err))
 	}
 
-	return nil, fmt.Errorf("unable to resolve stream for %s: %w", videoID, err)
+	return nil, fmt.Errorf("unable to resolve stream for %s: %s", videoID, strings.Join(errorsList, " | "))
 }
 
-func (r *Resolver) resolveAndroid(videoID string) (*StreamResult, error) {
+func (r *Resolver) resolveAndroid(videoID string, gl string) (*StreamResult, error) {
 	ua := "com.google.android.youtube/21.03.36(Linux; U; Android 16; en_US; SM-S908E Build/TP1A.220624.014) gzip"
 	payload := map[string]any{
 		"context": map[string]any{
@@ -119,7 +130,7 @@ func (r *Resolver) resolveAndroid(videoID string) (*StreamResult, error) {
 				"clientFormFactor":  "SMALL_FORM_FACTOR",
 				"userAgent":         ua,
 				"hl":                "en",
-				"gl":                "IN",
+				"gl":                gl,
 			},
 			"user": map[string]any{
 				"enableSafetyMode": false,
