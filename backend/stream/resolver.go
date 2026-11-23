@@ -134,7 +134,7 @@ func (r *Resolver) resolveAndroid(videoID string) (*StreamResult, error) {
 		"contentCheckOk": true,
 		"racyCheckOk":    true,
 	}
-	return r.executePlayerCall(videoID, payload, ua)
+	return r.executePlayerCall(videoID, payload, ua, "3", "21.03.36")
 }
 
 func (r *Resolver) resolveVisionOS(videoID string) (*StreamResult, error) {
@@ -158,7 +158,7 @@ func (r *Resolver) resolveVisionOS(videoID string) (*StreamResult, error) {
 		"contentCheckOk": true,
 		"racyCheckOk":    true,
 	}
-	return r.executePlayerCall(videoID, payload, ua)
+	return r.executePlayerCall(videoID, payload, ua, "101", "1.02")
 }
 
 func (r *Resolver) resolveIOS(videoID string) (*StreamResult, error) {
@@ -182,10 +182,10 @@ func (r *Resolver) resolveIOS(videoID string) (*StreamResult, error) {
 		"contentCheckOk": true,
 		"racyCheckOk":    true,
 	}
-	return r.executePlayerCall(videoID, payload, ua)
+	return r.executePlayerCall(videoID, payload, ua, "5", "19.34.2")
 }
 
-func (r *Resolver) executePlayerCall(videoID string, payload map[string]any, userAgent string) (*StreamResult, error) {
+func (r *Resolver) executePlayerCall(videoID string, payload map[string]any, userAgent string, clientNameHeader string, clientVersion string) (*StreamResult, error) {
 	reqBody, _ := json.Marshal(payload)
 	req, err := http.NewRequest("POST", "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8&prettyPrint=false&alt=json", bytes.NewReader(reqBody))
 	if err != nil {
@@ -193,6 +193,13 @@ func (r *Resolver) executePlayerCall(videoID string, payload map[string]any, use
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", userAgent)
+	if clientNameHeader != "" {
+		req.Header.Set("X-Youtube-Client-Name", clientNameHeader)
+	}
+	if clientVersion != "" {
+		req.Header.Set("X-Youtube-Client-Version", clientVersion)
+	}
+	req.Header.Set("X-GOOG-API-FORMAT-VERSION", "2")
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
